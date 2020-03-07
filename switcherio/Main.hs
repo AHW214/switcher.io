@@ -87,25 +87,28 @@ findFilesWhere predicate dir = do
 
 
 --------------------------------------------------------------------------------
-switchFileNames :: String -> String -> IO ()
-switchFileNames ext dir = do
-  files <- findFilesWhere (return . isExtensionOf ext) dir
-  shuffled <- shuffleList files
+findFilesWithExt :: String -> FilePath -> IO [ FilePath ]
+findFilesWithExt ext =
+  findFilesWhere (return . isExtensionOf ext)
 
-  let pairs = zip files shuffled
 
-  mapM_ switcheroo pairs
+--------------------------------------------------------------------------------
+switchFileNames :: [ FilePath ] -> IO ()
+switchFileNames files =
+   zip files
+   <$> shuffleList files
+   >>= mapM_ switcheroo
+    where
+      switcheroo ( file1, file2 ) = do
+        temp <- makeTempName 10
 
-  where
-    switcheroo ( file1, file2 ) = do
-      temp <- makeTempName 10
+        renameFile file1 temp
+        renameFile file2 file1
+        renameFile temp file2
 
-      renameFile file1 temp
-      renameFile file2 file1
-      renameFile temp file2
+      makeTempName =
+        randomRSequence ( 'A', 'z' )
 
-    makeTempName =
-      randomRSequence ( 'A', 'z' )
 
 --------------------------------------------------------------------------------
 main :: IO ()
@@ -115,9 +118,28 @@ main = do
   case parsed of
     Right opts ->
       case getExtension opts of
-        Just ext ->
-          getCurrentDirectory
-          >>= switchFileNames ext
+        Just ext -> do
+          dir <- getCurrentDirectory
+          files <- findFilesWithExt ext dir
+
+          let len = length files
+
+          if len <= 0 then do
+            putStrLn $ "no files with extension '" ++ ext ++ "' found"
+            exitSuccess
+          else do
+            putStrLn $ "found " ++ show len ++ " files\n"
+                      ++ "are you sure you want to continue (y/n)"
+
+            response <- getLine
+
+            if response == "yes" || response == "y" then do
+              putStrLn "swapping..."
+              switchFileNames files
+              putStrLn "done!"
+            else do
+              putStrLn "aborting..."
+              exitSuccess
 
         _ ->
           fail "no extension provided"
