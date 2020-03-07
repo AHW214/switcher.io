@@ -3,6 +3,7 @@ module Main where
 
 --------------------------------------------------------------------------------
 import           Control.Monad         (filterM, foldM, forM_)
+import           Data.Maybe            (listToMaybe, mapMaybe)
 import           System.Console.GetOpt
 import           System.Directory      (doesFileExist, getCurrentDirectory,
                                         listDirectory, renameFile)
@@ -12,14 +13,33 @@ import           System.FilePath       (FilePath, isExtensionOf)
 
 
 --------------------------------------------------------------------------------
-import           Src.Random                (shuffleList)
+import           SwitcherIO.Random                (randomRSequence, shuffleList)
 
 
 --------------------------------------------------------------------------------
 data Flag
   = Recursive
   | Extension String
-  deriving (Show)
+  deriving (Eq, Show)
+
+
+--------------------------------------------------------------------------------
+hasRecursive :: [ Flag ] -> Bool
+hasRecursive = any (== Recursive)
+
+
+--------------------------------------------------------------------------------
+fromExtension :: Flag -> Maybe String
+fromExtension flag =
+  case flag of
+    Extension ext ->
+      Just ext
+
+    _ ->
+      Nothing
+
+getExtension :: [ Flag ] -> Maybe String
+getExtension = listToMaybe . mapMaybe fromExtension
 
 
 --------------------------------------------------------------------------------
@@ -74,13 +94,18 @@ switchFileNames ext dir = do
 
   let pairs = zip files shuffled
 
-  forM_ pairs
-    (\( f1, f2 ) -> do
-        renameFile f1 "bob"
-        renameFile f2 f1
-        renameFile "bob" f2
-    )
+  mapM_ switcheroo pairs
 
+  where
+    switcheroo ( file1, file2 ) = do
+      temp <- makeTempName 10
+
+      renameFile file1 temp
+      renameFile file2 file1
+      renameFile temp file2
+
+    makeTempName =
+      randomRSequence ( 'A', 'z' )
 
 --------------------------------------------------------------------------------
 main :: IO ()
@@ -89,7 +114,13 @@ main = do
 
   case parsed of
     Right opts ->
-      switchFileNames "txt" =<< getCurrentDirectory
+      case getExtension opts of
+        Just ext ->
+          getCurrentDirectory
+          >>= switchFileNames ext
+
+        _ ->
+          fail "no extension provided"
 
     Left err ->
-      ioError $ userError err
+      fail err

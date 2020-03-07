@@ -1,14 +1,17 @@
 {- https://wiki.haskell.org/Random_shuffle -}
 
-module Src.Random
-  ( shuffleList
+module SwitcherIO.Random
+  ( randomSequence
+  , randomRSequence
+  , shuffleList
   ) where
 
 
 --------------------------------------------------------------------------------
 import           Data.Map      (Map, (!))
 import qualified Data.Map      as Map
-import           System.Random (RandomGen, getStdRandom, randomR)
+import           System.Random (Random, RandomGen, StdGen, getStdRandom,
+                                random, randomR)
 
 
 --------------------------------------------------------------------------------
@@ -38,3 +41,28 @@ fisherYates gen xs =
 --------------------------------------------------------------------------------
 shuffleList :: [ a ] -> IO [ a ]
 shuffleList = getStdRandom . flip fisherYates
+
+
+--------------------------------------------------------------------------------
+randomSequenceHelper :: Random a => (StdGen -> ( a, StdGen )) -> Int -> IO [ a ]
+randomSequenceHelper rand count =
+  getStdRandom (\g -> helper ( [], g ) count)
+  where
+    helper acc@( seq, g ) n =
+      if n <= 0 then
+        acc
+      else
+        let ( r, g' ) = rand g in
+        ( r:seq, g' )
+
+
+--------------------------------------------------------------------------------
+randomRSequence :: Random a => ( a, a ) -> Int -> IO [ a ]
+randomRSequence =
+  randomSequenceHelper . randomR
+
+
+--------------------------------------------------------------------------------
+randomSequence :: Random a => Int -> IO [ a ]
+randomSequence =
+  randomSequenceHelper random
