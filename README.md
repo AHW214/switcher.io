@@ -1,2 +1,3 @@
-# switcher.io
+# switcherio
+
 probably a bad idea

@@ -1,6 +1,6 @@
 {- https://wiki.haskell.org/Random_shuffle -}
 
-module SwitcherIO.Random
+module Random
   ( randomSequence
   , randomRSequence
   , shuffleList

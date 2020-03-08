@@ -1,0 +1,40 @@
+name:                switcherio
+version:             0.1.0.0
+github:              "AHW214/switcher.io"
+license:             MIT
+author:              "Adam Weider"
+maintainer:          "adamweider98@gmail.com"
+copyright:           "Adam Weider"
+
+extra-source-files:
+- README.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/AHW214/switcher.io#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- containers
+- directory
+- filepath
+- random
+
+library:
+  source-dirs: src
+
+executables:
+  switcherio-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - switcherio

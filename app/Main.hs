@@ -13,7 +13,7 @@ import           System.FilePath       (FilePath, isExtensionOf)
 
 
 --------------------------------------------------------------------------------
-import           SwitcherIO.Random                (randomRSequence, shuffleList)
+import           Random                (randomRSequence, shuffleList)
 
 
 --------------------------------------------------------------------------------
@@ -25,7 +25,7 @@ data Flag
 
 --------------------------------------------------------------------------------
 hasRecursive :: [ Flag ] -> Bool
-hasRecursive = any (== Recursive)
+hasRecursive = elem Recursive
 
 
 --------------------------------------------------------------------------------

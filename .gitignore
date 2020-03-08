@@ -23,5 +23,9 @@ cabal.project.local~
 .HTF/
 .ghc.environment.*
 
-# Haskell output dir
-out/
+# Haskell Stack
+.stack-work/
+*~
+
+# Haskell IDE Engine
+hie.yaml
