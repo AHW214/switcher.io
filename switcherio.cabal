@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ef5187e7545cd0340058c98d23fdbcbc9717d359a34d3240a7044dc12f374a03
+-- hash: 0323f0c13fd41e52ff045c1cb02581b7959412c044ec3c056c68062b4e68accd
 
 name:           switcherio
 version:        0.1.0.0
@@ -25,6 +25,7 @@ source-repository head
 
 library
   exposed-modules:
+      Option
       Random
   other-modules:
       Paths_switcherio
@@ -36,6 +37,7 @@ library
     , directory
     , filepath
     , random
+    , safe-exceptions
   default-language: Haskell2010
 
 executable switcherio-exe
@@ -51,5 +53,6 @@ executable switcherio-exe
     , directory
     , filepath
     , random
+    , safe-exceptions
     , switcherio
   default-language: Haskell2010

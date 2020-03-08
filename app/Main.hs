@@ -2,9 +2,8 @@ module Main where
 
 
 --------------------------------------------------------------------------------
-import           Control.Monad         (filterM, foldM, forM_)
-import           Data.Maybe            (listToMaybe, mapMaybe)
-import           System.Console.GetOpt
+import           Control.Monad         (filterM, foldM, forM_, unless, when)
+import           Data.Char             (toLower)
 import           System.Directory      (doesFileExist, getCurrentDirectory,
                                         listDirectory, renameFile)
 import           System.Environment    (getArgs)
@@ -13,54 +12,8 @@ import           System.FilePath       (FilePath, isExtensionOf)
 
 
 --------------------------------------------------------------------------------
+import           Option                (getExtension, parseOptions)
 import           Random                (randomRSequence, shuffleList)
-
-
---------------------------------------------------------------------------------
-data Flag
-  = Recursive
-  | Extension String
-  deriving (Eq, Show)
-
-
---------------------------------------------------------------------------------
-hasRecursive :: [ Flag ] -> Bool
-hasRecursive = elem Recursive
-
-
---------------------------------------------------------------------------------
-fromExtension :: Flag -> Maybe String
-fromExtension flag =
-  case flag of
-    Extension ext ->
-      Just ext
-
-    _ ->
-      Nothing
-
-getExtension :: [ Flag ] -> Maybe String
-getExtension = listToMaybe . mapMaybe fromExtension
-
-
---------------------------------------------------------------------------------
-options :: [ OptDescr Flag ]
-options =
-  [ Option ['r'] ["recursive"] (NoArg Recursive)              "recurse into subdirectories"
-  , Option ['e'] ["extension"] (ReqArg Extension "EXTENSION") "type of files to swap"
-  ]
-
-
---------------------------------------------------------------------------------
-parseOptions :: [ String ] -> Either String [ Flag ]
-parseOptions args =
-  case getOpt Permute options args of
-    ( opts, _, [] ) ->
-      Right opts
-
-    ( _, _, errs ) ->
-      Left $ concat errs ++ usageInfo header options
-    where
-      header = "Usage: switch -e <EXTENSION> [OPTION...]"
 
 
 --------------------------------------------------------------------------------
@@ -113,36 +66,28 @@ switchFileNames files =
 --------------------------------------------------------------------------------
 main :: IO ()
 main = do
-  parsed <- parseOptions <$> getArgs
+  args <- getArgs
+  opts <- parseOptions args
+  ext <- getExtension opts
 
-  case parsed of
-    Right opts ->
-      case getExtension opts of
-        Just ext -> do
-          dir <- getCurrentDirectory
-          files <- findFilesWithExt ext dir
+  dir <- getCurrentDirectory
+  files <- findFilesWithExt ext dir
 
-          let len = length files
+  let len = length files
 
-          if len <= 0 then do
-            putStrLn $ "no files with extension '" ++ ext ++ "' found"
-            exitSuccess
-          else do
-            putStrLn $ "found " ++ show len ++ " files\n"
-                      ++ "are you sure you want to continue (y/n)"
+  when (len <= 0) $ do
+    putStrLn $ "No files with extension '" ++ ext ++ "' found"
+    exitSuccess
 
-            response <- getLine
+  putStrLn $ "Found " ++ show len ++ " files with extension '" ++ ext ++ "'\n"
+            ++ "Type 'y(es)' to confirm the switcheroo"
 
-            if response == "yes" || response == "y" then do
-              putStrLn "swapping..."
-              switchFileNames files
-              putStrLn "done!"
-            else do
-              putStrLn "aborting..."
-              exitSuccess
+  response <- map toLower <$> getLine
 
-        _ ->
-          fail "no extension provided"
+  unless (response `elem` [ "y", "yes" ]) $ do
+    putStrLn "Aborting..."
+    exitSuccess
 
-    Left err ->
-      fail err
+  putStrLn "Swapping..."
+  switchFileNames files
+  putStrLn "Done!"
