@@ -51,16 +51,16 @@ switchFileNames files =
    zip files
    <$> shuffleList files
    >>= mapM_ switcheroo
-    where
-      switcheroo ( file1, file2 ) = do
-        temp <- makeTempName 10
+  where
+    switcheroo ( file1, file2 ) = do
+      temp <- makeTempName 10
 
-        renameFile file1 temp
-        renameFile file2 file1
-        renameFile temp file2
+      renameFile file1 temp
+      renameFile file2 file1
+      renameFile temp file2
 
-      makeTempName =
-        randomRSequence ( 'A', 'z' )
+    makeTempName =
+      randomRSequence ( 'A', 'z' )
 
 
 --------------------------------------------------------------------------------

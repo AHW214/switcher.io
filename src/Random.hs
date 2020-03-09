@@ -53,7 +53,7 @@ randomSequenceHelper rand count =
         acc
       else
         let ( r, g' ) = rand g in
-        ( r:seq, g' )
+        helper ( r:seq, g' ) (n - 1)
 
 
 --------------------------------------------------------------------------------
