@@ -2,10 +2,10 @@ module Main where
 
 
 --------------------------------------------------------------------------------
-import           Control.Monad         (filterM, foldM, forM_, unless, when)
+import           Control.Monad         (filterM, foldM, unless)
 import           Data.Char             (toLower)
 import           System.Directory      (doesFileExist, getCurrentDirectory,
-                                        listDirectory, renameFile)
+                                        listDirectory)
 import           System.Environment    (getArgs, getProgName)
 import           System.Exit           (exitFailure, exitSuccess)
 import           System.FilePath       (FilePath, isExtensionOf)
@@ -13,7 +13,8 @@ import           System.FilePath       (FilePath, isExtensionOf)
 
 --------------------------------------------------------------------------------
 import           Option                (parseOptions, tryGetExtension)
-import           Random                (randomRSequence, shuffleList)
+import           Switch                (generateSwitches, serializeSwitches,
+                                        switch)
 
 
 --------------------------------------------------------------------------------
@@ -46,24 +47,6 @@ findFilesWhere predicate dir =
 findFilesWithExt :: String -> FilePath -> IO [ FilePath ]
 findFilesWithExt ext =
   findFilesWhere (return . isExtensionOf ext)
-
-
---------------------------------------------------------------------------------
-switchFileNames :: [ FilePath ] -> IO ()
-switchFileNames files =
-   zip files
-   <$> shuffleList files
-   >>= mapM_ switcheroo
-  where
-    switcheroo ( file1, file2 ) = do
-      temp <- makeTempName 10
-
-      renameFile file1 temp
-      renameFile file2 file1
-      renameFile temp file2
-
-    makeTempName =
-      randomRSequence ( 'A', 'z' )
 
 
 --------------------------------------------------------------------------------
@@ -110,7 +93,9 @@ main = do
     askForYes "Type 'y(es)' to confirm the switcheroo"
 
     putStrLn "Swapping..."
-    switchFileNames files
+    switches <- generateSwitches files
+    switch switches
+    serializeSwitches switches files
     putStrLn "Done!"
 
   exitSuccess
