@@ -25,6 +25,7 @@ cabal.project.local~
 
 # Haskell Stack
 .stack-work/
+switcherio.cabal
 *~
 
 # Haskell IDE Engine
