@@ -29,3 +29,6 @@ cabal.project.local~
 
 # Haskell IDE Engine
 hie.yaml
+
+# Build Directory
+out/
