@@ -48,10 +48,11 @@ generateSwitches files = do
 
 
 --------------------------------------------------------------------------------
-serializeSwitches :: [ Switch ] -> [ FilePath ] -> IO ()
-serializeSwitches switches files = do
+serializeSwitches :: [ Switch ] -> [ FilePath ] -> IO FilePath
+serializeSwitches switches files = do -- todo: either check all files or just see if files exists with library function
   mapName <- makeMapName
   writeFile mapName $ show switchMap
+  return mapName
   where
     makeMapName =
       createUnique files (\i -> return $ "switchMap" ++ show i)

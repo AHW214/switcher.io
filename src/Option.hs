@@ -2,6 +2,7 @@ module Option
   ( Flag
   , Options
   , getExtension
+  , hasIrreversible
   , hasRecursive
   , parseOptions
   , tryGetExtension
@@ -18,6 +19,7 @@ import           System.Console.GetOpt
 --------------------------------------------------------------------------------
 data Flag
   = Recursive
+  | Irreversible
   | Extension String
   deriving (Eq)
 
@@ -58,6 +60,11 @@ hasRecursive = elem Recursive
 
 
 --------------------------------------------------------------------------------
+hasIrreversible :: Options -> Bool
+hasIrreversible = elem Irreversible
+
+
+--------------------------------------------------------------------------------
 fromExtension :: Flag -> Maybe String
 fromExtension flag =
   case flag of
@@ -87,8 +94,9 @@ getExtension opts =
 --------------------------------------------------------------------------------
 options :: [ OptDescr Flag ]
 options =
-  [ Option ['r'] ["recursive"] (NoArg Recursive)              "recurse into subdirectories"
-  , Option ['e'] ["extension"] (ReqArg Extension "EXTENSION") "type of files to swap"
+  [ Option ['r'] ["recursive"]    (NoArg Recursive)              "recurse into subdirectories"
+  , Option ['i'] ["irreversible"] (NoArg Irreversible)           "don't serialize the switch"
+  , Option ['e'] ["extension"]    (ReqArg Extension "EXTENSION") "specify type of files to switch"
   ]
 
 

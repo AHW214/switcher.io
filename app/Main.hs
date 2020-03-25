@@ -12,7 +12,8 @@ import           System.FilePath       (FilePath, isExtensionOf)
 
 
 --------------------------------------------------------------------------------
-import           Option                (parseOptions, tryGetExtension)
+import           Option                (hasIrreversible, parseOptions,
+                                        tryGetExtension)
 import           Switch                (generateSwitches, serializeSwitches,
                                         switch)
 
@@ -95,8 +96,11 @@ main = do
     putStrLn "Swapping..."
     switches <- generateSwitches files
     switch switches
-    serializeSwitches switches files
     putStrLn "Done!"
+
+    unless (hasIrreversible opts) $ do
+      mapName <- serializeSwitches switches files
+      putStrLn $ "Switches written to '" ++ mapName ++ "'"
 
   exitSuccess
   where
