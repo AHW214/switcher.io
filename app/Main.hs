@@ -6,13 +6,13 @@ import           Control.Monad         (filterM, foldM, forM_, unless, when)
 import           Data.Char             (toLower)
 import           System.Directory      (doesFileExist, getCurrentDirectory,
                                         listDirectory, renameFile)
-import           System.Environment    (getArgs)
+import           System.Environment    (getArgs, getProgName)
 import           System.Exit           (exitFailure, exitSuccess)
 import           System.FilePath       (FilePath, isExtensionOf)
 
 
 --------------------------------------------------------------------------------
-import           Option                (getExtension, parseOptions)
+import           Option                (parseOptions, tryGetExtension)
 import           Random                (randomRSequence, shuffleList)
 
 
@@ -31,12 +31,15 @@ partitionM predicate =
 
 
 --------------------------------------------------------------------------------
-findFilesWhere :: (FilePath -> IO Bool) -> FilePath -> IO [ FilePath ]
-findFilesWhere predicate dir = do
-  items <- listDirectory dir
-  ( files, dirs ) <- partitionM doesFileExist items
+listFilesAndDirs :: FilePath -> IO ( [ FilePath ], [ FilePath ] )
+listFilesAndDirs dir =
+  listDirectory dir >>= partitionM doesFileExist
 
-  filterM predicate files
+
+--------------------------------------------------------------------------------
+findFilesWhere :: (FilePath -> IO Bool) -> FilePath -> IO [ FilePath ]
+findFilesWhere predicate dir =
+  listFilesAndDirs dir >>= filterM predicate . fst
 
 
 --------------------------------------------------------------------------------
@@ -64,30 +67,53 @@ switchFileNames files =
 
 
 --------------------------------------------------------------------------------
+askToContinue :: String -> String -> [ String ] -> IO ()
+askToContinue question goodbye confirmation = do
+  putStrLn question
+  response <- map toLower <$> getLine
+  unless (response `elem` confirmation) $ do
+    putStrLn goodbye
+    exitSuccess
+
+
+--------------------------------------------------------------------------------
 main :: IO ()
 main = do
   args <- getArgs
   opts <- parseOptions args
-  ext <- getExtension opts
 
   dir <- getCurrentDirectory
-  files <- findFilesWithExt ext dir
+  progName <- getProgName
+
+  let maybeExt = tryGetExtension opts
+
+  files <- filter (progName /=) <$>
+    case tryGetExtension opts of
+      Just ext -> do
+        putStrLn $ "Searching for files with extension '" ++ ext ++ "'..."
+        findFilesWithExt ext dir
+
+      _ -> do
+        putStrLn "No extension given. Might be an especially bad idea"
+        askForYes "Type 'y(es)' if you would like to proceed..."
+
+        fst <$> listFilesAndDirs dir
 
   let len = length files
 
-  when (len <= 0) $ do
-    putStrLn $ "No files with extension '" ++ ext ++ "' found"
-    exitSuccess
+  if len <= 0 then
+    putStrLn "No files found"
+  else if len == 1 then
+    putStrLn "Only one file found, and it takes two to do a switcheroo"
+  else do
+    putStrLn $ "Found " ++ show len ++ " files"
+    askForYes "Type 'y(es)' to confirm the switcheroo"
 
-  putStrLn $ "Found " ++ show len ++ " files with extension '" ++ ext ++ "'\n"
-            ++ "Type 'y(es)' to confirm the switcheroo"
+    putStrLn "Swapping..."
+    switchFileNames files
+    putStrLn "Done!"
 
-  response <- map toLower <$> getLine
-
-  unless (response `elem` [ "y", "yes" ]) $ do
-    putStrLn "Aborting..."
-    exitSuccess
-
-  putStrLn "Swapping..."
-  switchFileNames files
-  putStrLn "Done!"
+  exitSuccess
+  where
+    askForYes question =
+      askToContinue question "Aborting..." [ "y", "yes" ]

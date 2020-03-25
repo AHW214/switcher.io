@@ -4,6 +4,7 @@ module Option
   , getExtension
   , hasRecursive
   , parseOptions
+  , tryGetExtension
   ) where
 
 
