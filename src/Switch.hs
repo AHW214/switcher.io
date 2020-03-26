@@ -17,59 +17,58 @@ import           Random           (randomRSequence, shuffleList)
 
 --------------------------------------------------------------------------------
 type Switch =
-  ( FilePath, FilePath, FilePath )
+  ( FilePath, FilePath )
 
 
 --------------------------------------------------------------------------------
-createUnique :: Eq a => [ a ] -> (Int -> IO a) -> IO a
-createUnique exclude gen =
+createUnique :: (a -> IO Bool) -> (Int -> IO a) -> IO a
+createUnique exists gen =
   attempt 0
   where
     attempt i = do
       x <- gen i
-      if x `elem` exclude then
+      conflict <- exists x
+
+      if conflict then
         attempt (i + 1)
       else
         return x
 
 
 --------------------------------------------------------------------------------
-makeTempName :: Int -> [ FilePath ] -> IO FilePath
+makeTempName :: Int -> IO FilePath
 makeTempName len =
-  flip createUnique (\_ -> randomRSequence ( 'A', 'z' ) len)
+  createUnique doesFileExist (\_ -> randomRSequence ( 'A', 'z' ) len)
 
 
 --------------------------------------------------------------------------------
 generateSwitches :: [ FilePath ] -> IO [ Switch ]
-generateSwitches files = do
-  shuffled <- shuffleList files
-  temps <- mapM (\_ -> makeTempName 10 files) files
-  return $ zip3 files temps shuffled
+generateSwitches files =
+  zip files <$> shuffleList files
 
 
 --------------------------------------------------------------------------------
 serializeSwitches :: [ Switch ] -> [ FilePath ] -> IO FilePath
-serializeSwitches switches files = do -- todo: either check all files or just see if files exists with library function
+serializeSwitches switches files = do
   mapName <- makeMapName
-  writeFile mapName $ show switchMap
+  writeFile mapName $ show switches
   return mapName
   where
     makeMapName =
-      createUnique files (\i -> return $ "switchMap" ++ show i)
-
-    switchMap =
-      map (\( file1, _, file2 ) -> ( file1, file2 )) switches
+      createUnique doesFileExist (\i -> return $ "switch" ++ show i)
 
 
 --------------------------------------------------------------------------------
 switch :: [ Switch ] -> IO ()
-switch map =
-  mapM_ toTemp map >> mapM_ fromTemp map
+switch switches =
+  mapM toTemp switches >>= mapM_ fromTemp
   where
-    toTemp ( file1, temp, _ ) =
+    toTemp ( file1, file2 ) = do
+      temp <- makeTempName 10
       renameFile file1 temp
+      return ( temp, file2 )
 
-    fromTemp ( _, temp, file2 ) =
+    fromTemp ( temp, file2 ) =
       renameFile temp file2
 
 
@@ -78,7 +77,8 @@ switchPairwise :: [ Switch ] -> IO ()
 switchPairwise =
   mapM_ switcheroo
   where
-    switcheroo ( file1, temp, file2 ) =
+    switcheroo ( file1, file2 ) = do
+      temp <- makeTempName 10
       renameFile file1 temp
-      >> renameFile file2 file1
-      >> renameFile temp file2
+      renameFile file2 file1
+      renameFile temp file2
