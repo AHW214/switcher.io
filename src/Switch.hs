@@ -1,12 +1,14 @@
 module Switch
   ( generateSwitches
   , serializeSwitches
+  , showSwitches
   , switch
   , switchPairwise
   ) where
 
 
 --------------------------------------------------------------------------------
+import           Data.List        (sort)
 import           System.Directory (doesFileExist, renameFile)
 import           System.FilePath  (FilePath)
 
@@ -56,6 +58,24 @@ serializeSwitches switches files = do
   where
     makeMapName =
       createUnique doesFileExist (\i -> return $ "switch" ++ show i)
+
+
+--------------------------------------------------------------------------------
+showSwitches :: [ Switch ] -> String
+showSwitches switches =
+  concatMap showSwitch sorted
+  where
+    sorted =
+      sort switches
+
+    padLen =
+      maximum $ map (length . fst) switches
+
+    padding file =
+      replicate (padLen - length file) ' '
+
+    showSwitch ( file1, file2 ) =
+      file1 ++ padding file1 ++ " -> " ++ file2 ++ "\n"
 
 
 --------------------------------------------------------------------------------

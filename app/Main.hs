@@ -15,7 +15,7 @@ import           System.FilePath       (FilePath, isExtensionOf)
 import           Option                (hasIrreversible, parseOptions,
                                         tryGetExtension)
 import           Switch                (generateSwitches, serializeSwitches,
-                                        switch)
+                                        showSwitches, switch)
 
 
 --------------------------------------------------------------------------------
@@ -55,6 +55,8 @@ askToContinue :: String -> String -> [ String ] -> IO ()
 askToContinue question goodbye confirmation = do
   putStrLn question
   response <- map toLower <$> getLine
+  putStrLn ""
+
   unless (response `elem` confirmation) $ do
     putStrLn goodbye
     exitSuccess
@@ -96,7 +98,8 @@ main = do
     putStrLn "Swapping..."
     switches <- generateSwitches files
     switch switches
-    putStrLn "Done!"
+    putStrLn $ "Done! These are the switches I made:\n\n"
+              ++ showSwitches switches
 
     unless (hasIrreversible opts) $ do
       mapName <- serializeSwitches switches files
