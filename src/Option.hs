@@ -1,17 +1,15 @@
 module Option
   ( Flag
   , Options
-  , getExtension
   , hasIrreversible
   , hasRecursive
   , parseOptions
   , tryGetExtension
+  , tryGetUndo
   ) where
 
 
 --------------------------------------------------------------------------------
-import           Control.Exception.Safe (Exception, MonadThrow, SomeException,
-                                         throwM)
 import           Data.Maybe             (listToMaybe, mapMaybe)
 import           System.Console.GetOpt
 
@@ -21,6 +19,7 @@ data Flag
   = Recursive
   | Irreversible
   | Extension String
+  | Undo String
   deriving (Eq)
 
 
@@ -29,30 +28,10 @@ type Options = [ Flag ]
 
 
 --------------------------------------------------------------------------------
-data OptionException
-  = CannotParse [ String ]
-  | MissingExtension
+tryGetOption :: (Flag -> Maybe a) -> Options -> Maybe a
+tryGetOption fromFlag =
+  listToMaybe . mapMaybe fromFlag
 
-
---------------------------------------------------------------------------------
-instance Show OptionException where
-  show ex =
-    "OptionException: " ++ message
-    where
-      message =
-        case ex of
-          CannotParse errs ->
-            concat errs ++ usageInfo header options
-
-          MissingExtension ->
-            "No extension provided"
-
-      header =
-        "Usage: switch -e <EXTENSION> [OPTION...]"
-
-
-
-instance Exception OptionException
 
 --------------------------------------------------------------------------------
 hasRecursive :: Options -> Bool
@@ -65,30 +44,29 @@ hasIrreversible = elem Irreversible
 
 
 --------------------------------------------------------------------------------
-fromExtension :: Flag -> Maybe String
-fromExtension flag =
-  case flag of
-    Extension ext ->
-      Just ext
+tryGetUndo :: Options -> Maybe String
+tryGetUndo = tryGetOption fromUndo
+  where
+    fromUndo flag =
+      case flag of
+        Undo switchFile ->
+          Just switchFile
 
-    _ ->
-      Nothing
+        _ ->
+          Nothing
 
 
 --------------------------------------------------------------------------------
 tryGetExtension :: Options -> Maybe String
-tryGetExtension = listToMaybe . mapMaybe fromExtension
+tryGetExtension = tryGetOption fromExtension
+  where
+    fromExtension flag =
+      case flag of
+        Extension ext ->
+          Just ext
 
-
---------------------------------------------------------------------------------
-getExtension :: MonadThrow m => Options -> m String
-getExtension opts =
-  case tryGetExtension opts of
-    Just ext ->
-      return ext
-
-    _ ->
-      throwM MissingExtension
+        _ ->
+          Nothing
 
 
 --------------------------------------------------------------------------------
@@ -97,15 +75,19 @@ options =
   [ Option ['r'] ["recursive"]    (NoArg Recursive)              "recurse into subdirectories"
   , Option ['i'] ["irreversible"] (NoArg Irreversible)           "don't serialize the switch"
   , Option ['e'] ["extension"]    (ReqArg Extension "EXTENSION") "specify type of files to switch"
+  , Option ['u'] ["undo"]         (ReqArg Undo "FILE")           "undo a particular set of switches"
   ]
 
 
 --------------------------------------------------------------------------------
-parseOptions :: MonadThrow m => [ String ] -> m Options
+parseOptions :: [ String ] -> Either String Options
 parseOptions args =
   case getOpt Permute options args of
     ( opts, _, [] ) ->
-      return opts
+      Right opts
 
     ( _, _, errs ) ->
-      throwM $ CannotParse errs
+      Left $ concat errs ++ usageInfo header options
+  where
+    header =
+      "Usage: switch [OPTION...]"

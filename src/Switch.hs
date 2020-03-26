@@ -1,5 +1,6 @@
 module Switch
   ( generateSwitches
+  , readSwitches
   , serializeSwitches
   , showSwitches
   , switch
@@ -9,12 +10,16 @@ module Switch
 
 --------------------------------------------------------------------------------
 import           Data.List        (sort)
+import           Data.Maybe       (fromMaybe)
+import           Data.Tuple       (swap)
 import           System.Directory (doesFileExist, renameFile)
 import           System.FilePath  (FilePath)
+import           Text.Read        (readMaybe)
 
 
 --------------------------------------------------------------------------------
 import           Random           (randomRSequence, shuffleList)
+import           Util             (partitionM)
 
 
 --------------------------------------------------------------------------------
@@ -40,7 +45,7 @@ createUnique exists gen =
 --------------------------------------------------------------------------------
 makeTempName :: Int -> IO FilePath
 makeTempName len =
-  createUnique doesFileExist (\_ -> randomRSequence ( 'A', 'z' ) len)
+  createUnique doesFileExist (const $ randomRSequence ( 'A', 'z' ) len)
 
 
 --------------------------------------------------------------------------------
@@ -58,6 +63,24 @@ serializeSwitches switches = do
   where
     makeMapName =
       createUnique doesFileExist (\i -> return $ "switch" ++ show i)
+
+
+--------------------------------------------------------------------------------
+readSwitches :: FilePath -> IO (Maybe ( [ Switch ], [ Switch ] ))
+readSwitches switchFile = do
+  switches <- readFile switchFile
+  case readMaybe switches of
+    Just s ->
+      Just <$> partitionM canSwitch (invertSwitches s)
+
+    _ ->
+      return Nothing
+  where
+    invertSwitches =
+      map swap
+
+    canSwitch =
+      doesFileExist . fst
 
 
 --------------------------------------------------------------------------------

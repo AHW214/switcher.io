@@ -2,34 +2,21 @@ module Main where
 
 
 --------------------------------------------------------------------------------
-import           Control.Monad         (filterM, foldM, unless)
+import           Control.Monad         (filterM, unless)
 import           Data.Char             (toLower)
 import           System.Directory      (doesFileExist, getCurrentDirectory,
-                                        listDirectory)
+                                        listDirectory, removeFile)
 import           System.Environment    (getArgs, getProgName)
 import           System.Exit           (exitFailure, exitSuccess)
 import           System.FilePath       (FilePath, isExtensionOf)
 
 
 --------------------------------------------------------------------------------
-import           Option                (hasIrreversible, parseOptions,
-                                        tryGetExtension)
-import           Switch                (generateSwitches, serializeSwitches,
-                                        showSwitches, switch)
-
-
---------------------------------------------------------------------------------
-partitionM :: (a -> IO Bool) -> [ a ] -> IO ( [ a ], [ a ] )
-partitionM predicate =
-  foldM update ( [], [] )
-  where
-    update ( pass, fail ) x = do
-      res <- predicate x
-      return $
-        if res then
-          ( x:pass, fail )
-        else
-          ( pass, x:fail )
+import           Option                (Options, hasIrreversible, parseOptions,
+                                        tryGetExtension, tryGetUndo)
+import           Switch                (generateSwitches, readSwitches,
+                                        serializeSwitches, showSwitches, switch)
+import           Util                  (partitionM)
 
 
 --------------------------------------------------------------------------------
@@ -63,15 +50,15 @@ askToContinue question goodbye confirmation = do
 
 
 --------------------------------------------------------------------------------
-main :: IO ()
-main = do
-  args <- getArgs
-  opts <- parseOptions args
+askForYes :: String -> IO ()
+askForYes question =
+  askToContinue question "Aborting..." [ "y", "yes" ]
 
-  dir <- getCurrentDirectory
+
+--------------------------------------------------------------------------------
+runSwitch :: Options -> FilePath -> IO ()
+runSwitch opts dir = do
   progName <- getProgName
-
-  let maybeExt = tryGetExtension opts
 
   files <- filter (progName /=) <$>
     case tryGetExtension opts of
@@ -105,7 +92,55 @@ main = do
       mapName <- serializeSwitches switches
       putStrLn $ "Switches written to '" ++ mapName ++ "'"
 
-  exitSuccess
+
+--------------------------------------------------------------------------------
+runUndo :: Options -> FilePath -> FilePath -> IO ()
+runUndo opts switchFile dir = do
+  switches <- readSwitches switchFile
+
+  case switches of
+    Nothing ->
+      putStrLn "Invalid switch file"
+
+    Just ( [], _ ) ->
+      putStrLn "None of the original files are present"
+
+    Just ( include, exclude ) -> do
+      unless (null exclude) $
+        putStrLn $ "Switches that cannot be performed due to missing files:\n\n"
+                  ++ showSwitches exclude
+
+      putStrLn $ "Switches that will be performed:\n\n"
+                ++ showSwitches include
+
+      askForYes "Type 'y(es)' to confirm the (un)switcheroos"
+
+      putStrLn "Swapping..."
+      switch include
+      removeFile switchFile
+      putStrLn $ "Done!"
+
+
+--------------------------------------------------------------------------------
+main :: IO ()
+main =
+  getArgs >>= run
   where
-    askForYes question =
-      askToContinue question "Aborting..." [ "y", "yes" ]
+    run args =
+      case parseOptions args of
+        Right opts ->
+          getCurrentDirectory
+          >>= command opts
+          >> exitSuccess
+
+        Left err ->
+          putStrLn err
+          >> exitFailure
+
+    command opts =
+      case tryGetUndo opts of
+        Just switchFile ->
+          runUndo opts switchFile
+
+        _ ->
+          runSwitch opts
