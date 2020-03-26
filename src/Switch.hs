@@ -50,8 +50,8 @@ generateSwitches files =
 
 
 --------------------------------------------------------------------------------
-serializeSwitches :: [ Switch ] -> [ FilePath ] -> IO FilePath
-serializeSwitches switches files = do
+serializeSwitches :: [ Switch ] -> IO FilePath
+serializeSwitches switches = do
   mapName <- makeMapName
   writeFile mapName $ show switches
   return mapName

@@ -102,7 +102,7 @@ main = do
               ++ showSwitches switches
 
     unless (hasIrreversible opts) $ do
-      mapName <- serializeSwitches switches files
+      mapName <- serializeSwitches switches
       putStrLn $ "Switches written to '" ++ mapName ++ "'"
 
   exitSuccess
