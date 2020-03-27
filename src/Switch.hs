@@ -2,10 +2,12 @@ module Switch
   ( Switch
   , SwitchMap(..)
   , generateSwitches
+  , generateSwitchesRecursive
   , prepareUndo
   , readSwitches
   , serializeSwitches
   , showSwitches
+  , showSwitchesRecursive
   , switch
   , switchPairwise
   ) where
@@ -14,6 +16,7 @@ module Switch
 --------------------------------------------------------------------------------
 import           Data.List        (sort)
 import           Data.Maybe       (fromMaybe)
+import           Data.Tree        (Tree, drawTree)
 import           Data.Tuple       (swap)
 import           System.Directory (doesFileExist, renameFile)
 import           System.FilePath  (FilePath)
@@ -21,6 +24,7 @@ import           Text.Read        (readMaybe)
 
 
 --------------------------------------------------------------------------------
+import           Disk             (Hierarchy)
 import           Random           (randomRSequence, shuffleList)
 import           Util             (partitionM)
 
@@ -63,6 +67,12 @@ makeTempName len =
 generateSwitches :: [ FilePath ] -> IO [ Switch ]
 generateSwitches files =
   zip files <$> shuffleList files
+
+
+--------------------------------------------------------------------------------
+generateSwitchesRecursive :: Hierarchy -> IO (Tree ( FilePath, [ Switch ] ))
+generateSwitchesRecursive =
+  mapM (\( dir, files ) -> (,) dir <$> generateSwitches files)
 
 
 --------------------------------------------------------------------------------
@@ -113,6 +123,15 @@ showSwitches switches =
 
     showSwitch ( file1, file2 ) =
       file1 ++ padding file1 ++ " -> " ++ file2 ++ "\n"
+
+
+--------------------------------------------------------------------------------
+showSwitchesRecursive :: Tree ( FilePath, [ Switch ] ) -> String
+showSwitchesRecursive tree =
+  drawTree $ showFolder <$> tree
+  where
+    showFolder ( dir, switches ) =
+      dir ++ "\n" ++ showSwitches switches
 
 
 --------------------------------------------------------------------------------

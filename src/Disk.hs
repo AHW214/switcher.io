@@ -1,6 +1,9 @@
 module Disk
-  ( findFilesWhere
+  ( Hierarchy
+  , findFilesWhere
+  , findFilesWhereRecursive
   , findFilesWithExt
+  , findFilesWithExtRecursive
   , listFiles
   , viewFileHierarchy
   , viewFilesRecursive
@@ -9,6 +12,7 @@ module Disk
 
 --------------------------------------------------------------------------------
 import           Control.Monad    (filterM)
+import           Data.Bifunctor   (second)
 import           Data.Maybe       (mapMaybe)
 import           Data.Tree        (Tree(..), unfoldTreeM)
 import           System.Directory (doesFileExist, listDirectory, makeAbsolute,
@@ -23,6 +27,18 @@ import           Util             (partitionM)
 --------------------------------------------------------------------------------
 type Hierarchy =
   Tree ( FilePath, [ FilePath ] )
+
+
+--------------------------------------------------------------------------------
+pruneTree :: (a -> Bool) -> Tree a -> Maybe (Tree a)
+pruneTree isNodeEmpty tree@(Node value forest) =
+  if isNodeEmpty value && null below then
+    Nothing
+  else
+    Just $ Node value below
+  where
+    below =
+      mapMaybe (pruneTree isNodeEmpty) forest
 
 
 --------------------------------------------------------------------------------
@@ -60,15 +76,15 @@ viewFilesRecursive depth dir =
 
 
 --------------------------------------------------------------------------------
-pruneTree :: (a -> Bool) -> Tree a -> Maybe (Tree a)
-pruneTree isNodeEmpty tree@(Node value forest) =
-  if isNodeEmpty value && null below then
-    Nothing
-  else
-    Just $ Node value below
-  where
-    below =
-      mapMaybe (pruneTree isNodeEmpty) forest
+findFilesWhereRecursive :: (FilePath -> Bool) -> Int -> FilePath -> IO (Maybe Hierarchy)
+findFilesWhereRecursive predicate depth dir =
+  pruneTree (null . snd) . fmap (second $ filter predicate) <$> viewFileHierarchy depth dir
+
+
+--------------------------------------------------------------------------------
+findFilesWithExtRecursive :: String -> Int -> FilePath -> IO (Maybe Hierarchy)
+findFilesWithExtRecursive ext =
+  findFilesWhereRecursive (isExtensionOf ext)
 
 
 --------------------------------------------------------------------------------
