@@ -2,38 +2,20 @@ module Main where
 
 
 --------------------------------------------------------------------------------
-import           Control.Monad         (filterM, unless)
+import           Control.Monad         (unless)
 import           Data.Char             (toLower)
-import           System.Directory      (doesFileExist, getCurrentDirectory,
-                                        listDirectory, removeFile)
+import           System.Directory      (getCurrentDirectory, removeFile)
 import           System.Environment    (getArgs, getProgName)
 import           System.Exit           (exitFailure, exitSuccess)
-import           System.FilePath       (FilePath, isExtensionOf)
+import           System.FilePath       (FilePath)
 
 
 --------------------------------------------------------------------------------
+import           Disk
 import           Option                (Options, hasIrreversible, parseOptions,
                                         tryGetExtension, tryGetUndo)
 import           Switch
 import           Util                  (partitionM)
-
-
---------------------------------------------------------------------------------
-listFilesAndDirs :: FilePath -> IO ( [ FilePath ], [ FilePath ] )
-listFilesAndDirs dir =
-  listDirectory dir >>= partitionM doesFileExist
-
-
---------------------------------------------------------------------------------
-findFilesWhere :: (FilePath -> IO Bool) -> FilePath -> IO [ FilePath ]
-findFilesWhere predicate dir =
-  listFilesAndDirs dir >>= filterM predicate . fst
-
-
---------------------------------------------------------------------------------
-findFilesWithExt :: String -> FilePath -> IO [ FilePath ]
-findFilesWithExt ext =
-  findFilesWhere (return . isExtensionOf ext)
 
 
 --------------------------------------------------------------------------------
@@ -69,7 +51,7 @@ runSwitch opts dir = do
         putStrLn "No extension given. Might be an especially bad idea"
         askForYes "Type 'y(es)' if you would like to proceed:"
 
-        fst <$> listFilesAndDirs dir
+        listFiles dir
 
   let len = length files
 
