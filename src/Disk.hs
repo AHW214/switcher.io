@@ -2,13 +2,15 @@ module Disk
   ( findFilesWhere
   , findFilesWithExt
   , listFiles
-  , listFileHierarchy
+  , viewFileHierarchy
+  , viewFilesRecursive
   ) where
 
 
 --------------------------------------------------------------------------------
 import           Control.Monad    (filterM)
-import           Data.Tree        (Tree, unfoldTreeM)
+import           Data.Maybe       (mapMaybe)
+import           Data.Tree        (Tree(..), unfoldTreeM)
 import           System.Directory (doesFileExist, listDirectory, makeAbsolute,
                                    withCurrentDirectory)
 import           System.FilePath  (FilePath, isExtensionOf, (</>))
@@ -16,6 +18,11 @@ import           System.FilePath  (FilePath, isExtensionOf, (</>))
 
 --------------------------------------------------------------------------------
 import           Util             (partitionM)
+
+
+--------------------------------------------------------------------------------
+type Hierarchy =
+  Tree ( FilePath, [ FilePath ] )
 
 
 --------------------------------------------------------------------------------
@@ -31,13 +38,37 @@ listFiles dir =
 
 
 --------------------------------------------------------------------------------
-listFileHierarchy :: FilePath -> IO (Tree ( FilePath, [ FilePath ] ))
-listFileHierarchy =
-  unfoldTreeM makeNode
+viewFileHierarchy :: Int -> FilePath -> IO Hierarchy
+viewFileHierarchy depth directory =
+  unfoldTreeM makeNode ( directory, depth )
   where
-    makeNode dir = do
+    makeNode ( dir, level ) = do
       ( files, dirs ) <- listFilesAndDirs dir
-      return ( ( dir, files ), map (dir </>) dirs )
+      return ( ( dir, files ), nextLevel dir level dirs )
+
+    nextLevel dir level =
+      if level == 0 then
+        const []
+      else
+        map (\d -> ( dir </> d, level - 1))
+
+
+--------------------------------------------------------------------------------
+viewFilesRecursive :: Int -> FilePath -> IO (Maybe Hierarchy)
+viewFilesRecursive depth dir =
+  pruneTree (null . snd) <$> viewFileHierarchy depth dir
+
+
+--------------------------------------------------------------------------------
+pruneTree :: (a -> Bool) -> Tree a -> Maybe (Tree a)
+pruneTree isNodeEmpty tree@(Node value forest) =
+  if isNodeEmpty value && null below then
+    Nothing
+  else
+    Just $ Node value below
+  where
+    below =
+      mapMaybe (pruneTree isNodeEmpty) forest
 
 
 --------------------------------------------------------------------------------

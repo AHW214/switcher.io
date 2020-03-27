@@ -12,8 +12,7 @@ import           System.FilePath       (FilePath)
 
 --------------------------------------------------------------------------------
 import           Disk
-import           Option                (Options, hasIrreversible, parseOptions,
-                                        tryGetExtension, tryGetUndo)
+import           Option
 import           Switch
 import           Util                  (partitionM)
 
