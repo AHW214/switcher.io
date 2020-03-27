@@ -14,8 +14,7 @@ import           System.FilePath       (FilePath, isExtensionOf)
 --------------------------------------------------------------------------------
 import           Option                (Options, hasIrreversible, parseOptions,
                                         tryGetExtension, tryGetUndo)
-import           Switch                (generateSwitches, readSwitches,
-                                        serializeSwitches, showSwitches, switch)
+import           Switch
 import           Util                  (partitionM)
 
 
@@ -68,7 +67,7 @@ runSwitch opts dir = do
 
       _ -> do
         putStrLn "No extension given. Might be an especially bad idea"
-        askForYes "Type 'y(es)' if you would like to proceed..."
+        askForYes "Type 'y(es)' if you would like to proceed:"
 
         fst <$> listFilesAndDirs dir
 
@@ -80,7 +79,7 @@ runSwitch opts dir = do
     putStrLn "Only one file found, and it takes two to do a switcheroo"
   else do
     putStrLn $ "Found " ++ show len ++ " files"
-    askForYes "Type 'y(es)' to confirm the switcheroo"
+    askForYes "Type 'y(es)' to confirm the switcheroo:"
 
     putStrLn "Swapping..."
     switches <- generateSwitches files
@@ -89,7 +88,7 @@ runSwitch opts dir = do
               ++ showSwitches switches
 
     unless (hasIrreversible opts) $ do
-      mapName <- serializeSwitches switches
+      mapName <- serializeSwitches switches dir
       putStrLn $ "Switches written to '" ++ mapName ++ "'"
 
 
@@ -102,23 +101,30 @@ runUndo opts switchFile dir = do
     Nothing ->
       putStrLn "Invalid switch file"
 
-    Just ( [], _ ) ->
-      putStrLn "None of the original files are present"
+    Just (SwitchMap prevDir switches) -> do
+      unless (prevDir == dir) $
+        askForYes $ "The current directory is '" ++ dir ++ "'\n"
+                    ++ "These switches were made in the directory '" ++ prevDir ++ "'\n"
+                    ++ "Type 'y(es)' to proceed anyway:"
 
-    Just ( include, exclude ) -> do
-      unless (null exclude) $
-        putStrLn $ "Switches that cannot be performed due to missing files:\n\n"
-                  ++ showSwitches exclude
+      ( include, exclude ) <- prepareUndo switches
 
-      putStrLn $ "Switches that will be performed:\n\n"
-                ++ showSwitches include
+      if null include then
+        putStrLn "None of the original files are present"
+      else do
+        unless (null exclude) $
+          putStrLn $ "Switches that cannot be performed due to missing files:\n\n"
+                    ++ showSwitches exclude
 
-      askForYes "Type 'y(es)' to confirm the (un)switcheroos"
+        putStrLn $ "Switches that will be performed:\n\n"
+                  ++ showSwitches include
 
-      putStrLn "Swapping..."
-      switch include
-      removeFile switchFile
-      putStrLn $ "Done!"
+        askForYes "Type 'y(es)' to confirm the (un)switcheroos:"
+
+        putStrLn "Swapping..."
+        switch include
+        removeFile switchFile
+        putStrLn $ "Done!"
 
 
 --------------------------------------------------------------------------------

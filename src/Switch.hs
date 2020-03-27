@@ -1,5 +1,8 @@
 module Switch
-  ( generateSwitches
+  ( Switch
+  , SwitchMap(..)
+  , generateSwitches
+  , prepareUndo
   , readSwitches
   , serializeSwitches
   , showSwitches
@@ -25,6 +28,14 @@ import           Util             (partitionM)
 --------------------------------------------------------------------------------
 type Switch =
   ( FilePath, FilePath )
+
+
+--------------------------------------------------------------------------------
+data SwitchMap
+  = SwitchMap
+    { directory :: FilePath
+    , switches :: [ Switch ]
+    } deriving (Read, Show)
 
 
 --------------------------------------------------------------------------------
@@ -55,26 +66,29 @@ generateSwitches files =
 
 
 --------------------------------------------------------------------------------
-serializeSwitches :: [ Switch ] -> IO FilePath
-serializeSwitches switches = do
+serializeSwitches :: [ Switch ] -> FilePath -> IO FilePath
+serializeSwitches switches dir = do
   mapName <- makeMapName
-  writeFile mapName $ show switches
+  writeFile mapName $ show switchMap
   return mapName
   where
     makeMapName =
       createUnique doesFileExist (\i -> return $ "switch" ++ show i)
 
+    switchMap =
+      SwitchMap dir switches
+
 
 --------------------------------------------------------------------------------
-readSwitches :: FilePath -> IO (Maybe ( [ Switch ], [ Switch ] ))
+readSwitches :: FilePath -> IO (Maybe SwitchMap)
 readSwitches switchFile = do
-  switches <- readFile switchFile
-  case readMaybe switches of
-    Just s ->
-      Just <$> partitionM canSwitch (invertSwitches s)
+  readMaybe <$> readFile switchFile
 
-    _ ->
-      return Nothing
+
+--------------------------------------------------------------------------------
+prepareUndo :: [ Switch ] -> IO ( [ Switch ], [ Switch ] )
+prepareUndo =
+  partitionM canSwitch . invertSwitches
   where
     invertSwitches =
       map swap
