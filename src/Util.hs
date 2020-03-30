@@ -1,10 +1,13 @@
 module Util
   ( partitionM
+  , pruneTree
   ) where
 
 
 --------------------------------------------------------------------------------
 import           Control.Monad (foldM)
+import           Data.Maybe    (mapMaybe)
+import           Data.Tree     (Tree(..))
 
 
 --------------------------------------------------------------------------------
@@ -19,3 +22,15 @@ partitionM predicate =
           ( x:pass, fail )
         else
           ( pass, x:fail )
+
+
+--------------------------------------------------------------------------------
+pruneTree :: (a -> Bool) -> Tree a -> Maybe (Tree a)
+pruneTree isNodeEmpty tree@(Node value forest) =
+  if isNodeEmpty value && null below then
+    Nothing
+  else
+    Just $ Node value below
+  where
+    below =
+      mapMaybe (pruneTree isNodeEmpty) forest

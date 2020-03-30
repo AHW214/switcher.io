@@ -11,7 +11,7 @@ import           System.FilePath       (FilePath)
 
 
 --------------------------------------------------------------------------------
-import           Disk
+import           FileSystem
 import           Option
 import           Switch
 import           Util                  (partitionM)

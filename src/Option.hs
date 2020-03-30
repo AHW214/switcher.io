@@ -1,8 +1,8 @@
 module Option
   ( Flag
   , Options
+  , getRecursive
   , hasIrreversible
-  , hasRecursive
   , parseOptions
   , tryGetExtension
   , tryGetUndo
@@ -10,16 +10,17 @@ module Option
 
 
 --------------------------------------------------------------------------------
-import           Data.Maybe             (listToMaybe, mapMaybe)
+import           Data.Maybe             (fromMaybe, listToMaybe, mapMaybe)
 import           System.Console.GetOpt
+import           Text.Read              (readMaybe)
 
 
 --------------------------------------------------------------------------------
 data Flag
-  = Recursive
-  | Irreversible
+  = Irreversible
   | Extension String
   | Undo String
+  | Recursive (Maybe String)
   deriving (Eq)
 
 
@@ -31,11 +32,6 @@ type Options = [ Flag ]
 tryGetOption :: (Flag -> Maybe a) -> Options -> Maybe a
 tryGetOption fromFlag =
   listToMaybe . mapMaybe fromFlag
-
-
---------------------------------------------------------------------------------
-hasRecursive :: Options -> Bool
-hasRecursive = elem Recursive
 
 
 --------------------------------------------------------------------------------
@@ -70,9 +66,30 @@ tryGetExtension = tryGetOption fromExtension
 
 
 --------------------------------------------------------------------------------
+getRecursive :: Options -> Int
+getRecursive =
+  fromMaybe 0 . tryGetOption fromRecursive
+  where
+    fromRecursive flag =
+      case flag of
+        Recursive level ->
+          fromLevel level
+        _ ->
+          Nothing
+
+    fromLevel level =
+      case level >>= readMaybe of
+        Nothing ->
+          Just (-1)
+
+        lvl ->
+          lvl
+
+
+--------------------------------------------------------------------------------
 options :: [ OptDescr Flag ]
 options =
-  [ Option ['r'] ["recursive"]    (NoArg Recursive)              "recurse into subdirectories"
+  [ Option ['r'] ["recursive"]    (OptArg Recursive "NUMBER")    "recurse into subdirectories"
   , Option ['i'] ["irreversible"] (NoArg Irreversible)           "don't serialize the switch"
   , Option ['e'] ["extension"]    (ReqArg Extension "EXTENSION") "specify type of files to switch"
   , Option ['u'] ["undo"]         (ReqArg Undo "FILE")           "undo a particular set of switches"

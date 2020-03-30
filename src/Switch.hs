@@ -2,18 +2,17 @@ module Switch
   ( Switch
   , SwitchMap(..)
   , generateSwitches
-  , generateSwitchesRecursive
   , prepareUndo
   , readSwitches
   , serializeSwitches
   , showSwitches
-  , showSwitchesRecursive
   , switch
   , switchPairwise
   ) where
 
 
 --------------------------------------------------------------------------------
+import           Control.Monad    ((<=<))
 import           Data.List        (sort)
 import           Data.Maybe       (fromMaybe)
 import           Data.Tree        (Tree, drawTree)
@@ -24,7 +23,7 @@ import           Text.Read        (readMaybe)
 
 
 --------------------------------------------------------------------------------
-import           Disk             (Hierarchy)
+import           FileSystem       (FileSystem)
 import           Random           (randomRSequence, shuffleList)
 import           Util             (partitionM)
 
@@ -70,9 +69,11 @@ generateSwitches files =
 
 
 --------------------------------------------------------------------------------
-generateSwitchesRecursive :: Hierarchy -> IO (Tree ( FilePath, [ Switch ] ))
+{-
+generateSwitchesRecursive :: FileSystem [ FilePath ] -> IO (FileSystem [ Switch ])
 generateSwitchesRecursive =
-  mapM (\( dir, files ) -> (,) dir <$> generateSwitches files)
+  mapM generateSwitches
+-}
 
 
 --------------------------------------------------------------------------------
@@ -83,7 +84,7 @@ serializeSwitches switches dir = do
   return mapName
   where
     makeMapName =
-      createUnique doesFileExist (\i -> return $ "switch" ++ show i)
+      createUnique doesFileExist (return . ("switch" ++) . show)
 
     switchMap =
       SwitchMap dir switches
@@ -91,8 +92,8 @@ serializeSwitches switches dir = do
 
 --------------------------------------------------------------------------------
 readSwitches :: FilePath -> IO (Maybe SwitchMap)
-readSwitches switchFile = do
-  readMaybe <$> readFile switchFile
+readSwitches = do
+  fmap readMaybe . readFile
 
 
 --------------------------------------------------------------------------------
@@ -126,18 +127,20 @@ showSwitches switches =
 
 
 --------------------------------------------------------------------------------
-showSwitchesRecursive :: Tree ( FilePath, [ Switch ] ) -> String
-showSwitchesRecursive tree =
-  drawTree $ showFolder <$> tree
+{-
+showSwitchesRecursive :: FileSystem [ Switch ] -> String
+showSwitchesRecursive =
+  drawTree . fmap showFolder
   where
     showFolder ( dir, switches ) =
       dir ++ "\n" ++ showSwitches switches
+-}
 
 
 --------------------------------------------------------------------------------
 switch :: [ Switch ] -> IO ()
-switch switches =
-  mapM toTemp switches >>= mapM_ fromTemp
+switch =
+  mapM_ fromTemp <=< mapM toTemp
   where
     toTemp ( file1, file2 ) = do
       temp <- makeTempName 10
