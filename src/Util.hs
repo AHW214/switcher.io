@@ -1,6 +1,6 @@
 module Util
-  ( partitionM
-  , pruneTree
+  ( filterTree
+  , partitionM
   ) where
 
 
@@ -25,12 +25,12 @@ partitionM predicate =
 
 
 --------------------------------------------------------------------------------
-pruneTree :: (a -> Bool) -> Tree a -> Maybe (Tree a)
-pruneTree isNodeEmpty tree@(Node value forest) =
-  if isNodeEmpty value && null below then
-    Nothing
-  else
+filterTree :: (a -> Bool) -> Tree a -> Maybe (Tree a)
+filterTree predicate (Node value forest) =
+  if predicate value || not (null below) then
     Just $ Node value below
+  else
+    Nothing
   where
     below =
-      mapMaybe (pruneTree isNodeEmpty) forest
+      mapMaybe (filterTree predicate) forest

@@ -1,29 +1,48 @@
 module FileSystem
   ( FileSystem
-  , buildFileSystem
-  , drawFileSystem
-  , findFilesWhere
-  , findFilesWithExt
-  , listFiles
-  , listFilesAndDirs
+  , build
+  , buildWhere
+  , buildWithExt
+  , draw
+  , filter
+  , mapFilter
   ) where
 
 
 --------------------------------------------------------------------------------
-import           Control.Monad    (filterM, (<=<))
+import qualified Data.List        as List (filter)
 import           Data.Tree        (Tree, drawTree, unfoldTreeM)
+import           Prelude          hiding (filter)
 import           System.Directory (doesFileExist, listDirectory)
 import           System.FilePath  (FilePath, isExtensionOf, (</>))
 
 
 --------------------------------------------------------------------------------
-import           Util             (partitionM, pruneTree)
+import           Util             (partitionM, filterTree)
 
 
 --------------------------------------------------------------------------------
 newtype FileSystem a =
   FileSystem (Tree ( FilePath, a ))
   deriving (Foldable, Functor, Traversable, Show)
+
+
+--------------------------------------------------------------------------------
+draw :: (Show a) => FileSystem a -> String
+draw (FileSystem tree) =
+  drawTree $ fmap show tree
+
+
+--------------------------------------------------------------------------------
+mapFilter :: (a -> Bool) -> FileSystem [ a ] -> FileSystem [ a ]
+mapFilter predicate =
+  fmap $ List.filter predicate
+
+
+--------------------------------------------------------------------------------
+filter :: (a -> Bool) -> FileSystem a -> Maybe (FileSystem a)
+filter predicate (FileSystem tree) =
+  FileSystem <$> filterTree (predicate . snd) tree
 
 
 --------------------------------------------------------------------------------
@@ -36,8 +55,8 @@ listFilesAndDirs dir =
 
 
 --------------------------------------------------------------------------------
-buildFileSystem :: Int -> FilePath -> IO (FileSystem [ FilePath ])
-buildFileSystem depth directory =
+build :: Int -> FilePath -> IO (FileSystem [ FilePath ])
+build depth directory =
   FileSystem <$> unfoldTreeM makeNode ( depth, directory )
   where
     makeNode ( level, dir ) = do
@@ -52,24 +71,13 @@ buildFileSystem depth directory =
 
 
 --------------------------------------------------------------------------------
-drawFileSystem :: (Show a) => FileSystem a -> String
-drawFileSystem (FileSystem tree) =
-  drawTree $ fmap show tree
+buildWhere :: (FilePath -> Bool) -> Int -> FilePath
+              -> IO (FileSystem [ FilePath ])
+buildWhere predicate depth =
+  fmap (mapFilter predicate) . build depth
 
 
 --------------------------------------------------------------------------------
-listFiles :: FilePath -> IO [ FilePath ]
-listFiles dir =
-  fst <$> listFilesAndDirs dir
-
-
---------------------------------------------------------------------------------
-findFilesWhere :: (FilePath -> IO Bool) -> FilePath -> IO [ FilePath ]
-findFilesWhere predicate dir =
-  listFiles dir >>= filterM predicate
-
-
---------------------------------------------------------------------------------
-findFilesWithExt :: String -> FilePath -> IO [ FilePath ]
-findFilesWithExt ext =
-  findFilesWhere (return . isExtensionOf ext)
+buildWithExt :: String -> Int -> FilePath -> IO (FileSystem [ FilePath ])
+buildWithExt ext depth =
+  buildWhere (isExtensionOf ext) depth

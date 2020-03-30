@@ -11,7 +11,7 @@ import           System.FilePath       (FilePath)
 
 
 --------------------------------------------------------------------------------
-import           FileSystem
+import qualified FileSystem            as FS
 import           Option
 import           Switch
 import           Util                  (partitionM)
@@ -40,37 +40,66 @@ runSwitch :: Options -> FilePath -> IO ()
 runSwitch opts dir = do
   progName <- getProgName
 
-  files <- filter (progName /=) <$>
+  buildOp <-
     case tryGetExtension opts of
       Just ext -> do
         putStrLn $ "Searching for files with extension '" ++ ext ++ "'..."
-        findFilesWithExt ext dir
+        return (FS.buildWithExt ext)
 
       _ -> do
         putStrLn "No extension given. Might be an especially bad idea"
         askForYes "Type 'y(es)' if you would like to proceed:"
 
-        listFiles dir
+        return FS.build
 
-  let len = length files
+  let depth = getRecursive opts
+  maybeFs <- sanitize progName <$> buildOp depth dir
 
-  if len <= 0 then
-    putStrLn "No files found"
-  else if len == 1 then
-    putStrLn "Only one file found, and it takes two to do a switcheroo"
-  else do
-    putStrLn $ "Found " ++ show len ++ " files"
-    askForYes "Type 'y(es)' to confirm the switcheroo:"
+  case maybeFs of
+    Nothing ->
+      putStrLn "Could not find at least two files to switch"
+    Just fs -> do
+      let ( numFiles, numFolders ) = numItems fs
 
-    putStrLn "Swapping..."
-    switches <- generateSwitches files
-    switch switches
-    putStrLn $ "Done! These are the switches I made:\n\n"
-              ++ showSwitches switches
+      putStrLn $ FS.draw fs
 
-    unless (hasIrreversible opts) $ do
-      mapName <- serializeSwitches switches dir
-      putStrLn $ "Switches written to '" ++ mapName ++ "'"
+      putStrLn $ "Found " ++ show numFiles ++ " files in "
+                ++ show numFolders ++ " folders"
+      askForYes "Type 'y(es)' to confirm the switcheroo:"
+
+      putStrLn "Swapping..."
+      switches <- mapM generateSwitches fs
+      mapM_ switch switches
+      putStrLn $ "Done! These are the switches I made:\n\n"
+                ++ FS.draw (fmap showSwitches switches)
+
+      {-
+      unless (hasIrreversible opts) $ do
+        mapName <- serializeSwitches switches dir
+        putStrLn $ "Switches written to '" ++ mapName ++ "'"
+      -}
+
+  where
+    numItems =
+      foldl (\num@( numFiles, numFolders ) fs ->
+        case fs of
+          [] ->
+            num
+
+          _ ->
+            ( numFiles + length fs, numFolders + 1 )
+      ) ( 0, 0 )
+
+    sanitize progName =
+      FS.filter (not . null)
+      . fmap atLeastTwo
+      . FS.mapFilter (progName /=)
+
+    atLeastTwo xs =
+      if length xs < 2 then
+        []
+      else
+        xs
 
 
 --------------------------------------------------------------------------------
