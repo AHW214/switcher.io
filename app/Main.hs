@@ -5,7 +5,7 @@ module Main where
 import           Control.Monad         (unless)
 import           Data.Char             (toLower)
 import           System.Directory      (getCurrentDirectory, removeFile)
-import           System.Environment    (getArgs, getProgName)
+import           System.Environment    (getArgs, getExecutablePath)
 import           System.Exit           (exitFailure, exitSuccess)
 import           System.FilePath       (FilePath)
 
@@ -38,7 +38,7 @@ askForYes question =
 --------------------------------------------------------------------------------
 runSwitch :: Options -> FilePath -> IO ()
 runSwitch opts dir = do
-  progName <- getProgName
+  exePath <- getExecutablePath
 
   buildOp <-
     case tryGetExtension opts of
@@ -53,7 +53,7 @@ runSwitch opts dir = do
         return FS.build
 
   let depth = getRecursive opts
-  maybeFs <- sanitize progName <$> buildOp depth dir
+  maybeFs <- sanitize exePath <$> buildOp depth dir
 
   case maybeFs of
     Nothing ->
@@ -61,17 +61,17 @@ runSwitch opts dir = do
     Just fs -> do
       let ( numFiles, numFolders ) = numItems fs
 
-      putStrLn $ FS.draw fs
+      putStrLn $ FS.drawMany fs
 
       putStrLn $ "Found " ++ show numFiles ++ " files in "
                 ++ show numFolders ++ " folders"
       askForYes "Type 'y(es)' to confirm the switcheroo:"
 
       putStrLn "Swapping..."
-      switches <- mapM generateSwitches fs
-      mapM_ switch switches
+      switches <- generateSwitches fs
+      switch switches
       putStrLn $ "Done! These are the switches I made:\n\n"
-                ++ FS.draw (fmap showSwitches switches)
+                ++ showSwitches switches
 
       {-
       unless (hasIrreversible opts) $ do
@@ -90,10 +90,10 @@ runSwitch opts dir = do
             ( numFiles + length fs, numFolders + 1 )
       ) ( 0, 0 )
 
-    sanitize progName =
+    sanitize exePath =
       FS.filter (not . null)
       . fmap atLeastTwo
-      . FS.mapFilter (progName /=)
+      . FS.mapFilter (exePath /=)
 
     atLeastTwo xs =
       if length xs < 2 then
@@ -103,6 +103,8 @@ runSwitch opts dir = do
 
 
 --------------------------------------------------------------------------------
+
+{-
 runUndo :: Options -> FilePath -> FilePath -> IO ()
 runUndo opts switchFile dir = do
   switches <- readSwitches switchFile
@@ -111,7 +113,7 @@ runUndo opts switchFile dir = do
     Nothing ->
       putStrLn "Invalid switch file"
 
-    Just (SwitchMap prevDir switches) -> do
+    Just fs -> do
       unless (prevDir == dir) $
         askForYes $ "The current directory is '" ++ dir ++ "'\n"
                     ++ "These switches were made in the directory '" ++ prevDir ++ "'\n"
@@ -135,7 +137,7 @@ runUndo opts switchFile dir = do
         switch include
         removeFile switchFile
         putStrLn $ "Done!"
-
+-}
 
 --------------------------------------------------------------------------------
 main :: IO ()
@@ -154,9 +156,12 @@ main =
           >> exitFailure
 
     command opts =
+      runSwitch opts
+      {-
       case tryGetUndo opts of
         Just switchFile ->
           runUndo opts switchFile
 
         _ ->
           runSwitch opts
+      -}

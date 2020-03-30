@@ -9,10 +9,12 @@ module FileSystem
   , drawManyWith
   , filter
   , mapFilter
+  , mapLabels
   ) where
 
 
 --------------------------------------------------------------------------------
+import           Data.Bifunctor   (first)
 import qualified Data.List        as List (filter)
 import           Data.Tree        (Tree, drawTree, unfoldTreeM)
 import           Prelude          hiding (filter)
@@ -27,7 +29,7 @@ import           Util             (partitionM, filterTree)
 --------------------------------------------------------------------------------
 newtype FileSystem a =
   FileSystem (Tree ( FilePath, a ))
-  deriving (Foldable, Functor, Traversable, Show)
+  deriving (Foldable, Functor, Read, Traversable, Show)
 
 
 --------------------------------------------------------------------------------
@@ -59,6 +61,12 @@ drawManyWith toStr =
 
 
 --------------------------------------------------------------------------------
+mapLabels :: (FilePath -> FilePath) -> FileSystem a -> FileSystem a
+mapLabels f (FileSystem tree) =
+  FileSystem $ fmap (first f) tree
+
+
+--------------------------------------------------------------------------------
 mapFilter :: (a -> Bool) -> FileSystem [ a ] -> FileSystem [ a ]
 mapFilter predicate =
   fmap $ List.filter predicate
@@ -73,10 +81,10 @@ filter predicate (FileSystem tree) =
 --------------------------------------------------------------------------------
 listFilesAndDirs :: FilePath -> IO ( [ FilePath ], [ FilePath ] )
 listFilesAndDirs dir =
-    listDirectory dir >>= partitionM isFile
+    listDirectory dir >>= partitionM doesFileExist . makeRelative
     where
-      isFile =
-        doesFileExist . (dir </>)
+      makeRelative =
+        map (dir </>)
 
 
 --------------------------------------------------------------------------------
@@ -92,7 +100,7 @@ build depth directory =
       if level == 0 then
         const []
       else
-        map (\d -> ( level - 1, dir </> d ))
+        map ( level - 1, )
 
 
 --------------------------------------------------------------------------------

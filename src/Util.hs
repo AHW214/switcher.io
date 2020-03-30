@@ -1,5 +1,6 @@
 module Util
-  ( filterTree
+  ( createUnique
+  , filterTree
   , partitionM
   ) where
 
@@ -34,3 +35,18 @@ filterTree predicate (Node value forest) =
   where
     below =
       mapMaybe (filterTree predicate) forest
+
+
+--------------------------------------------------------------------------------
+createUnique :: (a -> IO Bool) -> (Int -> IO a) -> IO a
+createUnique exists gen =
+  attempt 0
+  where
+    attempt i = do
+      x <- gen i
+      conflict <- exists x
+
+      if conflict then
+        attempt (i + 1)
+      else
+        return x
