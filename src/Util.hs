@@ -1,6 +1,8 @@
 module Util
   ( createUnique
   , filterTree
+  , getTreeRoot
+  , mapTreeRoot
   , partitionM
   ) where
 
@@ -35,6 +37,17 @@ filterTree predicate (Node value forest) =
   where
     below =
       mapMaybe (filterTree predicate) forest
+
+
+--------------------------------------------------------------------------------
+getTreeRoot :: Tree a -> a
+getTreeRoot (Node value _) = value
+
+
+--------------------------------------------------------------------------------
+mapTreeRoot :: (a -> a) -> Tree a -> Tree a
+mapTreeRoot f (Node value forest) =
+  Node (f value) forest
 
 
 --------------------------------------------------------------------------------

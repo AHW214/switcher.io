@@ -17,7 +17,7 @@ import           Data.List        (sortBy)
 import           Data.Maybe       (fromMaybe)
 import           Data.Tuple       (swap)
 import           System.Directory (doesFileExist, renameFile)
-import           System.FilePath  (FilePath, takeFileName)
+import           System.FilePath  (FilePath, makeRelative, takeFileName)
 import           Text.Read        (readMaybe)
 
 
@@ -51,11 +51,11 @@ generateSwitches =
 --------------------------------------------------------------------------------
 serializeSwitches :: FileSystem [ Switch ] -> FilePath -> IO FilePath
 serializeSwitches switches dir = do
-  mapName <- makeMapName
-  writeFile mapName $ show switches
-  return mapName
+  fileName <- makeFileName
+  writeFile fileName $ show switches
+  return fileName
   where
-    makeMapName =
+    makeFileName =
       createUnique doesFileExist (return . ("switch" ++) . show)
 
 
@@ -66,8 +66,8 @@ readSwitches =
 
 
 --------------------------------------------------------------------------------
-prepareUndo :: [ Switch ] -> IO ( [ Switch ], [ Switch ] )
-prepareUndo =
+prepareUndoInFolder :: [ Switch ] -> IO ( [ Switch ], [ Switch ] )
+prepareUndoInFolder =
   partitionM canSwitch . invertSwitches
   where
     invertSwitches =
@@ -75,6 +75,13 @@ prepareUndo =
 
     canSwitch =
       doesFileExist . fst
+
+
+--------------------------------------------------------------------------------
+prepareUndo :: FileSystem [ Switch ]
+  -> IO ( FileSystem [ Switch ], FileSystem [ Switch ] )
+prepareUndo =
+  fmap FS.unzip . mapM prepareUndoInFolder
 
 
 --------------------------------------------------------------------------------
@@ -99,9 +106,21 @@ showSwitchesInFolder switches =
 
 
 --------------------------------------------------------------------------------
-showSwitches :: FileSystem [ Switch ] -> String
-showSwitches =
-  FS.drawManyWith id . fmap showSwitchesInFolder
+showSwitches :: FilePath -> FileSystem [ Switch ] -> String
+showSwitches dir =
+  draw . rootLabel . relativeLabels . showFolders
+  where
+    showFolders =
+      fmap showSwitchesInFolder
+
+    relativeLabels =
+      FS.mapLabels (makeRelative dir)
+
+    rootLabel =
+      FS.setRootLabel dir
+
+    draw =
+      FS.drawManyWith id
 
 
 --------------------------------------------------------------------------------

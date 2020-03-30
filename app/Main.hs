@@ -4,7 +4,8 @@ module Main where
 --------------------------------------------------------------------------------
 import           Control.Monad         (unless)
 import           Data.Char             (toLower)
-import           System.Directory      (getCurrentDirectory, removeFile)
+import           System.Directory      (doesDirectoryExist, getCurrentDirectory,
+                                        removeFile)
 import           System.Environment    (getArgs, getExecutablePath)
 import           System.Exit           (exitFailure, exitSuccess)
 import           System.FilePath       (FilePath)
@@ -61,8 +62,6 @@ runSwitch opts dir = do
     Just fs -> do
       let ( numFiles, numFolders ) = numItems fs
 
-      putStrLn $ FS.drawMany fs
-
       putStrLn $ "Found " ++ show numFiles ++ " files in "
                 ++ show numFolders ++ " folders"
       askForYes "Type 'y(es)' to confirm the switcheroo:"
@@ -71,14 +70,11 @@ runSwitch opts dir = do
       switches <- generateSwitches fs
       switch switches
       putStrLn $ "Done! These are the switches I made:\n\n"
-                ++ showSwitches switches
+                ++ showSwitches dir switches
 
-      {-
       unless (hasIrreversible opts) $ do
-        mapName <- serializeSwitches switches dir
-        putStrLn $ "Switches written to '" ++ mapName ++ "'"
-      -}
-
+        switchFile <- serializeSwitches switches dir
+        putStrLn $ "Switches written to '" ++ switchFile ++ "'"
   where
     numItems =
       foldl (\num@( numFiles, numFolders ) fs ->
@@ -103,33 +99,34 @@ runSwitch opts dir = do
 
 
 --------------------------------------------------------------------------------
-
-{-
 runUndo :: Options -> FilePath -> FilePath -> IO ()
-runUndo opts switchFile dir = do
-  switches <- readSwitches switchFile
+runUndo opts switchFile _ = do
+  maybeSwitches <- readSwitches switchFile
 
-  case switches of
+  case maybeSwitches of
     Nothing ->
       putStrLn "Invalid switch file"
 
-    Just fs -> do
-      unless (prevDir == dir) $
-        askForYes $ "The current directory is '" ++ dir ++ "'\n"
-                    ++ "These switches were made in the directory '" ++ prevDir ++ "'\n"
-                    ++ "Type 'y(es)' to proceed anyway:"
+    Just switches -> do
+      let dir = FS.getRootLabel switches
+      dirExists <- doesDirectoryExist dir
+
+      unless dirExists $ do
+        putStrLn $ "Switches made in directory '" ++ dir -- make prettier
+                  ++ "'\nwhich no longer exists"
+        exitSuccess
 
       ( include, exclude ) <- prepareUndo switches
 
-      if null include then
+      if FS.isEmpty include then
         putStrLn "None of the original files are present"
       else do
-        unless (null exclude) $
+        unless (FS.isEmpty exclude) $
           putStrLn $ "Switches that cannot be performed due to missing files:\n\n"
-                    ++ showSwitches exclude
+                    ++ showSwitches dir exclude
 
         putStrLn $ "Switches that will be performed:\n\n"
-                  ++ showSwitches include
+                  ++ showSwitches dir include
 
         askForYes "Type 'y(es)' to confirm the (un)switcheroos:"
 
@@ -137,7 +134,7 @@ runUndo opts switchFile dir = do
         switch include
         removeFile switchFile
         putStrLn $ "Done!"
--}
+
 
 --------------------------------------------------------------------------------
 main :: IO ()
@@ -156,12 +153,9 @@ main =
           >> exitFailure
 
     command opts =
-      runSwitch opts
-      {-
       case tryGetUndo opts of
         Just switchFile ->
           runUndo opts switchFile
 
         _ ->
           runSwitch opts
-      -}
