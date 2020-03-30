@@ -21,6 +21,21 @@ dependencies:
 - filepath
 - random
 
+default-extensions:
+- DeriveFoldable
+- DeriveFunctor
+- DeriveTraversable
+- EmptyCase
+- FlexibleContexts
+- FlexibleInstances
+- GeneralizedNewtypeDeriving
+- InstanceSigs
+- LambdaCase
+- MultiParamTypeClasses
+- MultiWayIf
+- NamedFieldPuns
+- TupleSections
+
 library:
   source-dirs: src
 
