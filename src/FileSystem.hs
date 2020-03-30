@@ -4,6 +4,9 @@ module FileSystem
   , buildWhere
   , buildWithExt
   , draw
+  , drawMany
+  , drawWith
+  , drawManyWith
   , filter
   , mapFilter
   ) where
@@ -29,8 +32,30 @@ newtype FileSystem a =
 
 --------------------------------------------------------------------------------
 draw :: (Show a) => FileSystem a -> String
-draw (FileSystem tree) =
-  drawTree $ fmap show tree
+draw = drawWith show
+
+
+--------------------------------------------------------------------------------
+drawMany :: (Show a) => FileSystem [ a ] -> String
+drawMany = drawManyWith show
+
+
+--------------------------------------------------------------------------------
+drawWith :: (a -> String) -> FileSystem a -> String
+drawWith toStr (FileSystem tree) =
+  drawTree $ fmap showNode tree
+  where
+    showNode ( label, item ) =
+      label ++ "\n" ++ toStr item
+
+
+--------------------------------------------------------------------------------
+drawManyWith :: (a -> String) -> FileSystem [ a ] -> String
+drawManyWith toStr =
+  drawWith (foldMap $ bullet . toStr)
+  where
+    bullet =
+      ("-- " ++) . (++ "\n")
 
 
 --------------------------------------------------------------------------------
