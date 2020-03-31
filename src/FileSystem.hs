@@ -39,12 +39,12 @@ newtype FileSystem a =
 
 
 --------------------------------------------------------------------------------
-draw :: (Show a) => FileSystem a -> String
+draw :: Show a => FileSystem a -> String
 draw = drawWith show
 
 
 --------------------------------------------------------------------------------
-drawMany :: (Show a) => FileSystem [ a ] -> String
+drawMany :: Show a => FileSystem [ a ] -> String
 drawMany = drawManyWith show
 
 
@@ -103,7 +103,7 @@ unzip fs =
 
 
 --------------------------------------------------------------------------------
-isEmpty :: (Traversable t) => FileSystem (t a) -> Bool
+isEmpty :: Traversable t => FileSystem (t a) -> Bool
 isEmpty =
   getAll . foldMap (All . null)
 
@@ -142,5 +142,5 @@ buildWhere predicate depth =
 
 --------------------------------------------------------------------------------
 buildWithExt :: String -> Int -> FilePath -> IO (FileSystem [ FilePath ])
-buildWithExt ext depth =
-  buildWhere (isExtensionOf ext) depth
+buildWithExt ext =
+  buildWhere (isExtensionOf ext)

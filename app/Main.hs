@@ -2,20 +2,22 @@ module Main where
 
 
 --------------------------------------------------------------------------------
-import           Control.Monad         (unless)
-import           Data.Char             (toLower)
-import           System.Directory      (doesDirectoryExist, getCurrentDirectory,
-                                        removeFile)
-import           System.Environment    (getArgs, getExecutablePath)
-import           System.Exit           (exitFailure, exitSuccess)
-import           System.FilePath       (FilePath)
+import           Control.Monad      (join, unless)
+import           Data.Bifunctor     (bimap)
+import           Data.Char          (toLower)
+import           System.Directory   (doesDirectoryExist, getCurrentDirectory,
+                                     removeFile)
+import           System.Environment (getArgs, getExecutablePath)
+import           System.Exit        (exitFailure, exitSuccess)
+import           System.FilePath    (FilePath)
 
 
 --------------------------------------------------------------------------------
-import qualified FileSystem            as FS
+import           FileSystem         (FileSystem)
+import qualified FileSystem         as FS
 import           Option
-import           Switch
-import           Util                  (partitionM)
+import           Switch             as SW
+import           Util               (partitionM, whenJust)
 
 
 --------------------------------------------------------------------------------
@@ -37,71 +39,88 @@ askForYes question =
 
 
 --------------------------------------------------------------------------------
-runSwitch :: Options -> FilePath -> IO ()
-runSwitch opts dir = do
+pruneEmpty :: Traversable t => FileSystem (t a) -> Maybe (FileSystem (t a))
+pruneEmpty =
+  FS.filter (not . null)
+
+
+--------------------------------------------------------------------------------
+numItemsInFolders :: Traversable t => FileSystem (t a) -> ( Int, Int )
+numItemsInFolders =
+  foldl count ( 0, 0 )
+  where
+    count acc@( numItems, numFolders ) items =
+      if null items then
+        acc
+      else
+        ( numItems + length items, numFolders + 1 )
+
+
+--------------------------------------------------------------------------------
+findFilesToSwitch :: FileSystem [ FilePath ]
+  -> IO (Maybe (FileSystem [ FilePath ]))
+findFilesToSwitch fs =
+  pruneEmpty . fmap atLeastTwo . flip notMe fs <$> getExecutablePath
+  where
+    notMe path =
+      FS.mapFilter (path /=)
+
+    atLeastTwo xs =
+      case xs of { _:_:_ -> xs; _ -> [] }
+
+
+--------------------------------------------------------------------------------
+runSwitch :: Options -> IO ()
+runSwitch opts = do
+  dir <- getCurrentDirectory
   exePath <- getExecutablePath
 
   buildOp <-
     case tryGetExtension opts of
       Just ext -> do
         putStrLn $ "Searching for files with extension '" ++ ext ++ "'..."
-        return (FS.buildWithExt ext)
+        return $ FS.buildWithExt ext
 
       _ -> do
-        putStrLn "No extension given. Might be an especially bad idea"
-        askForYes "Type 'y(es)' if you would like to proceed:"
-
+        askForYes $ "No extension given. Might be an especially bad idea\n"
+                    ++ "Type 'y(es)' if you would like to proceed:"
         return FS.build
 
   let depth = getRecursive opts
-  maybeFs <- sanitize exePath <$> buildOp depth dir
+  maybeFs <- findFilesToSwitch =<< buildOp depth dir
 
   case maybeFs of
     Nothing ->
       putStrLn "Could not find at least two files to switch"
     Just fs -> do
-      let ( numFiles, numFolders ) = numItems fs
+      let ( numFiles, numFolders ) = numItemsInFolders fs
 
       putStrLn $ "Found " ++ show numFiles ++ " files in "
                 ++ show numFolders ++ " folders"
       askForYes "Type 'y(es)' to confirm the switcheroo:"
 
       putStrLn "Swapping..."
-      switches <- generateSwitches fs
-      switch switches
+      switches <- SW.generate fs
+      SW.run switches
       putStrLn $ "Done! These are the switches I made:\n\n"
-                ++ showSwitches dir switches
+                ++ SW.display dir switches
 
       unless (hasIrreversible opts) $ do
-        switchFile <- serializeSwitches switches dir
+        switchFile <- SW.serialize switches dir
         putStrLn $ "Switches written to '" ++ switchFile ++ "'"
-  where
-    numItems =
-      foldl (\num@( numFiles, numFolders ) fs ->
-        case fs of
-          [] ->
-            num
-
-          _ ->
-            ( numFiles + length fs, numFolders + 1 )
-      ) ( 0, 0 )
-
-    sanitize exePath =
-      FS.filter (not . null)
-      . fmap atLeastTwo
-      . FS.mapFilter (exePath /=)
-
-    atLeastTwo xs =
-      if length xs < 2 then
-        []
-      else
-        xs
 
 
 --------------------------------------------------------------------------------
-runUndo :: Options -> FilePath -> FilePath -> IO ()
-runUndo opts switchFile _ = do
-  maybeSwitches <- readSwitches switchFile
+prepareUndo :: FileSystem [ Switch ]
+ -> IO (Maybe (FileSystem [ Switch ]), Maybe (FileSystem [ Switch ]))
+prepareUndo =
+  fmap (join bimap pruneEmpty) . SW.sanitize
+
+
+--------------------------------------------------------------------------------
+runUndo :: FilePath -> Options -> IO ()
+runUndo switchFile opts = do
+  maybeSwitches <- SW.load switchFile
 
   case maybeSwitches of
     Nothing ->
@@ -112,28 +131,29 @@ runUndo opts switchFile _ = do
       dirExists <- doesDirectoryExist dir
 
       unless dirExists $ do
-        putStrLn $ "Switches made in directory '" ++ dir -- make prettier
-                  ++ "'\nwhich no longer exists"
+        putStrLn $ "Switches made in directory which no longer exists:\n'" ++ dir ++ "'"
         exitSuccess
 
-      ( include, exclude ) <- prepareUndo switches
+      undo <- prepareUndo switches
 
-      if FS.isEmpty include then
-        putStrLn "None of the original files are present"
-      else do
-        unless (FS.isEmpty exclude) $
-          putStrLn $ "Switches that cannot be performed due to missing files:\n\n"
-                    ++ showSwitches dir exclude
+      case undo of
+        ( Nothing, _ ) ->
+          putStrLn "None of the original files are present"
 
-        putStrLn $ "Switches that will be performed:\n\n"
-                  ++ showSwitches dir include
+        ( Just include, exclude ) -> do
+          whenJust exclude $ \ex ->
+            putStrLn $ "Switches that cannot be performed due to missing files:\n\n"
+                      ++ SW.display dir ex
 
-        askForYes "Type 'y(es)' to confirm the (un)switcheroos:"
+          putStrLn $ "Switches that will be performed:\n\n"
+                    ++ SW.display dir include
 
-        putStrLn "Swapping..."
-        switch include
-        removeFile switchFile
-        putStrLn $ "Done!"
+          askForYes "Type 'y(es)' to confirm the (un)switcheroos:"
+
+          putStrLn "Swapping..."
+          SW.run include
+          removeFile switchFile
+          putStrLn "Done!"
 
 
 --------------------------------------------------------------------------------
@@ -144,8 +164,7 @@ main =
     run args =
       case parseOptions args of
         Right opts ->
-          getCurrentDirectory
-          >>= command opts
+          command opts
           >> exitSuccess
 
         Left err ->
@@ -155,7 +174,7 @@ main =
     command opts =
       case tryGetUndo opts of
         Just switchFile ->
-          runUndo opts switchFile
+          runUndo switchFile opts
 
         _ ->
           runSwitch opts

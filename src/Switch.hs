@@ -1,12 +1,12 @@
 module Switch
   ( Switch
-  , generateSwitches
-  , prepareUndo
-  , readSwitches
-  , serializeSwitches
-  , showSwitches
-  , switch
-  , switchPairwise
+  , generate
+  , sanitize
+  , load
+  , serialize
+  , display
+  , run
+  , runPairwise
   ) where
 
 
@@ -40,8 +40,8 @@ makeTempName len =
 
 
 --------------------------------------------------------------------------------
-generateSwitches :: FileSystem [ FilePath ] -> IO (FileSystem [ Switch ])
-generateSwitches =
+generate :: FileSystem [ FilePath ] -> IO (FileSystem [ Switch ])
+generate =
   mapM switchFolder
   where
     switchFolder files =
@@ -49,8 +49,8 @@ generateSwitches =
 
 
 --------------------------------------------------------------------------------
-serializeSwitches :: FileSystem [ Switch ] -> FilePath -> IO FilePath
-serializeSwitches switches dir = do
+serialize :: FileSystem [ Switch ] -> FilePath -> IO FilePath
+serialize switches dir = do
   fileName <- makeFileName
   writeFile fileName $ show switches
   return fileName
@@ -60,14 +60,14 @@ serializeSwitches switches dir = do
 
 
 --------------------------------------------------------------------------------
-readSwitches :: FilePath -> IO (Maybe (FileSystem [ Switch ]))
-readSwitches =
+load :: FilePath -> IO (Maybe (FileSystem [ Switch ]))
+load =
   fmap readMaybe . readFile
 
 
 --------------------------------------------------------------------------------
-prepareUndoInFolder :: [ Switch ] -> IO ( [ Switch ], [ Switch ] )
-prepareUndoInFolder =
+sanitizeFolder :: [ Switch ] -> IO ( [ Switch ], [ Switch ] )
+sanitizeFolder =
   partitionM canSwitch . invertSwitches
   where
     invertSwitches =
@@ -78,15 +78,15 @@ prepareUndoInFolder =
 
 
 --------------------------------------------------------------------------------
-prepareUndo :: FileSystem [ Switch ]
+sanitize :: FileSystem [ Switch ]
   -> IO ( FileSystem [ Switch ], FileSystem [ Switch ] )
-prepareUndo =
-  fmap FS.unzip . mapM prepareUndoInFolder
+sanitize =
+  fmap FS.unzip . mapM sanitizeFolder
 
 
 --------------------------------------------------------------------------------
-showSwitchesInFolder :: [ Switch ] -> [ String ]
-showSwitchesInFolder switches =
+displayEach :: [ Switch ] -> [ String ]
+displayEach switches =
   map showSwitch sorted
   where
     sorted =
@@ -106,12 +106,12 @@ showSwitchesInFolder switches =
 
 
 --------------------------------------------------------------------------------
-showSwitches :: FilePath -> FileSystem [ Switch ] -> String
-showSwitches dir =
+display :: FilePath -> FileSystem [ Switch ] -> String
+display dir =
   draw . rootLabel . relativeLabels . showFolders
   where
     showFolders =
-      fmap showSwitchesInFolder
+      fmap displayEach
 
     relativeLabels =
       FS.mapLabels (makeRelative dir)
@@ -124,8 +124,8 @@ showSwitches dir =
 
 
 --------------------------------------------------------------------------------
-switch :: FileSystem [ Switch ] -> IO ()
-switch =
+run :: FileSystem [ Switch ] -> IO ()
+run =
   mapM_ $ mapM_ fromTemp <=< mapM toTemp
   where
     toTemp ( file1, file2 ) = do
@@ -138,8 +138,8 @@ switch =
 
 
 --------------------------------------------------------------------------------
-switchPairwise :: FileSystem [ Switch ] -> IO ()
-switchPairwise =
+runPairwise :: FileSystem [ Switch ] -> IO ()
+runPairwise =
   mapM_ $ mapM_ switcheroo
   where
     switcheroo ( file1, file2 ) = do

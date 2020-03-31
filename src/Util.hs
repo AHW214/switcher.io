@@ -4,11 +4,12 @@ module Util
   , getTreeRoot
   , mapTreeRoot
   , partitionM
+  , whenJust
   ) where
 
 
 --------------------------------------------------------------------------------
-import           Control.Monad (foldM)
+import           Control.Monad (foldM, forM_)
 import           Data.Maybe    (mapMaybe)
 import           Data.Tree     (Tree(..))
 
@@ -63,3 +64,8 @@ createUnique exists gen =
         attempt (i + 1)
       else
         return x
+
+
+--------------------------------------------------------------------------------
+whenJust :: Monad m => Maybe a -> (a -> m ()) -> m ()
+whenJust = forM_
