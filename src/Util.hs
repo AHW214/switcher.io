@@ -1,17 +1,36 @@
 module Util
-  ( createUnique
-  , filterTree
+  ( FileName
+  , atLeast
+  , createUnique
+  , directoryHasFile
   , getTreeRoot
   , mapTreeRoot
   , partitionM
+  , pruneTree
+  , renameInDirectory
   , whenJust
   ) where
 
 
 --------------------------------------------------------------------------------
-import           Control.Monad (foldM, forM_)
-import           Data.Maybe    (mapMaybe)
-import           Data.Tree     (Tree(..))
+import           Control.Monad    (foldM, forM_)
+import           Data.Maybe       (mapMaybe)
+import           Data.Tree        (Tree(..))
+import           System.Directory (doesFileExist, renameFile)
+import           System.FilePath  ((</>))
+
+
+--------------------------------------------------------------------------------
+type FileName = String
+
+
+--------------------------------------------------------------------------------
+atLeast :: Int -> [ a ] -> Bool
+atLeast n =
+  if n > 0 then
+    not . null . drop (n - 1)
+  else
+    const True
 
 
 --------------------------------------------------------------------------------
@@ -19,25 +38,25 @@ partitionM :: (a -> IO Bool) -> [ a ] -> IO ( [ a ], [ a ] )
 partitionM predicate =
   foldM update ( [], [] )
   where
-    update ( pass, fail ) x = do
+    update ( passed, failed ) x = do
       res <- predicate x
       return $
         if res then
-          ( x:pass, fail )
+          ( x:passed, failed )
         else
-          ( pass, x:fail )
+          ( passed, x:failed )
 
 
 --------------------------------------------------------------------------------
-filterTree :: (a -> Bool) -> Tree a -> Maybe (Tree a)
-filterTree predicate (Node value forest) =
+pruneTree :: (a -> Bool) -> Tree a -> Maybe (Tree a)
+pruneTree predicate (Node value forest) =
   if predicate value || not (null below) then
     Just $ Node value below
   else
     Nothing
   where
     below =
-      mapMaybe (filterTree predicate) forest
+      mapMaybe (pruneTree predicate) forest
 
 
 --------------------------------------------------------------------------------
@@ -69,3 +88,15 @@ createUnique exists gen =
 --------------------------------------------------------------------------------
 whenJust :: Monad m => Maybe a -> (a -> m ()) -> m ()
 whenJust = forM_
+
+
+--------------------------------------------------------------------------------
+directoryHasFile :: FilePath -> FileName -> IO Bool
+directoryHasFile dir =
+  doesFileExist . (dir </>)
+
+
+--------------------------------------------------------------------------------
+renameInDirectory :: FilePath -> FileName -> FileName -> IO ()
+renameInDirectory dir prev new =
+  renameFile (dir </> prev) (dir </> new)

@@ -7,29 +7,31 @@ module FileSystem
   , drawMany
   , drawWith
   , drawManyWith
-  , filter
   , getRootLabel
   , isEmpty
-  , mapFilter
+  , map
+  , mapBoth
   , mapLabels
+  , prune
+  , runWith
+  , runWith_
   , setRootLabel
   , unzip
   ) where
 
 
 --------------------------------------------------------------------------------
-import           Data.Bifunctor   (first)
-import qualified Data.List        as List (filter)
+import           Data.Bifunctor   (bimap, first)
 import           Data.Monoid      (All(..))
 import           Data.Tree        (Tree, drawTree, unfoldTreeM)
-import           Prelude          hiding (filter, unzip)
-import           System.Directory (doesFileExist, listDirectory)
-import           System.FilePath  (FilePath, isExtensionOf, (</>))
+import           Prelude          hiding (map, unzip)
+import           System.Directory (listDirectory)
+import           System.FilePath  (isExtensionOf, (</>))
 
 
 --------------------------------------------------------------------------------
-import           Util             (filterTree, getTreeRoot, mapTreeRoot,
-                                   partitionM)
+import           Util             (FileName, directoryHasFile, getTreeRoot,
+                                   mapTreeRoot, partitionM, pruneTree)
 
 
 --------------------------------------------------------------------------------
@@ -67,9 +69,24 @@ drawManyWith toStr =
 
 
 --------------------------------------------------------------------------------
+map :: (FilePath -> a -> b) -> FileSystem a -> FileSystem b
+map f (FileSystem tree) =
+  FileSystem $ fmap mapFolder tree
+  where
+    mapFolder ( dir, items ) =
+      ( dir, f dir items )
+
+
+--------------------------------------------------------------------------------
+mapBoth :: (FilePath -> FilePath) -> (a -> b) -> FileSystem a -> FileSystem b
+mapBoth f g (FileSystem tree) =
+  FileSystem $ fmap (bimap f g) tree
+
+
+--------------------------------------------------------------------------------
 mapLabels :: (FilePath -> FilePath) -> FileSystem a -> FileSystem a
-mapLabels f (FileSystem tree) =
-  FileSystem $ fmap (first f) tree
+mapLabels f =
+  mapBoth f id
 
 
 --------------------------------------------------------------------------------
@@ -85,15 +102,9 @@ setRootLabel label (FileSystem tree) =
 
 
 --------------------------------------------------------------------------------
-mapFilter :: (a -> Bool) -> FileSystem [ a ] -> FileSystem [ a ]
-mapFilter predicate =
-  fmap $ List.filter predicate
-
-
---------------------------------------------------------------------------------
-filter :: (a -> Bool) -> FileSystem a -> Maybe (FileSystem a) -- change from maybe to 'empty' tree
-filter predicate (FileSystem tree) =
-  FileSystem <$> filterTree (predicate . snd) tree
+prune :: (a -> Bool) -> FileSystem a -> Maybe (FileSystem a)
+prune predicate (FileSystem tree) =
+  FileSystem <$> pruneTree (predicate . snd) tree
 
 
 --------------------------------------------------------------------------------
@@ -109,16 +120,28 @@ isEmpty =
 
 
 --------------------------------------------------------------------------------
-listFilesAndDirs :: FilePath -> IO ( [ FilePath ], [ FilePath ] )
-listFilesAndDirs dir =
-    listDirectory dir >>= partitionM doesFileExist . makeRelative
-    where
-      makeRelative =
-        map (dir </>)
+runWith :: Monad m => (FilePath -> a -> m b) -> FileSystem a -> m (FileSystem b)
+runWith action (FileSystem tree) =
+  FileSystem <$> mapM runFolder tree
+  where
+    runFolder ( dir, items ) =
+      ( dir, ) <$> action dir items
 
 
 --------------------------------------------------------------------------------
-build :: Int -> FilePath -> IO (FileSystem [ FilePath ])
+runWith_ :: Monad m => (FilePath -> a -> m b) -> FileSystem a -> m ()
+runWith_ action (FileSystem tree) =
+  mapM_ (uncurry action) tree
+
+
+--------------------------------------------------------------------------------
+listFilesAndDirs :: FilePath -> IO ( [ FileName ], [ FilePath ] )
+listFilesAndDirs dir =
+    listDirectory dir >>= partitionM (directoryHasFile dir)
+
+
+--------------------------------------------------------------------------------
+build :: Int -> FilePath -> IO (FileSystem [ FileName ])
 build depth directory =
   FileSystem <$> unfoldTreeM makeNode ( depth, directory )
   where
@@ -130,17 +153,17 @@ build depth directory =
       if level == 0 then
         const []
       else
-        map ( level - 1, )
+        fmap $ ( level - 1, ) . (dir </>)
 
 
 --------------------------------------------------------------------------------
-buildWhere :: (FilePath -> Bool) -> Int -> FilePath
-              -> IO (FileSystem [ FilePath ])
+buildWhere :: (FileName -> Bool) -> Int -> FilePath
+              -> IO (FileSystem [ FileName ])
 buildWhere predicate depth =
-  fmap (mapFilter predicate) . build depth
+  fmap (fmap $ filter predicate) . build depth
 
 
 --------------------------------------------------------------------------------
-buildWithExt :: String -> Int -> FilePath -> IO (FileSystem [ FilePath ])
+buildWithExt :: String -> Int -> FilePath -> IO (FileSystem [ FileName ])
 buildWithExt ext =
   buildWhere (isExtensionOf ext)

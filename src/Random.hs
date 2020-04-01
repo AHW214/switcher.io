@@ -35,7 +35,7 @@ fisherYates gen xs =
       where
         toElems ( x, y ) = ( Map.elems x, y )
         numerate = zip [1..]
-        initial x gen = ( Map.singleton 0 x, gen )
+        initial x g = ( Map.singleton 0 x, g )
 
 
 --------------------------------------------------------------------------------
@@ -44,16 +44,16 @@ shuffleList = getStdRandom . flip fisherYates
 
 
 --------------------------------------------------------------------------------
-randomSequenceHelper :: Random a => (StdGen -> ( a, StdGen )) -> Int -> IO [ a ]
+randomSequenceHelper :: (StdGen -> ( a, StdGen )) -> Int -> IO [ a ]
 randomSequenceHelper rand count =
   getStdRandom (\g -> helper ( [], g ) count)
   where
-    helper acc@( seq, g ) n =
+    helper acc@( sq, g ) n =
       if n <= 0 then
         acc
       else
         let ( r, g' ) = rand g in
-        helper ( r:seq, g' ) (n - 1)
+        helper ( r:sq, g' ) (n - 1)
 
 
 --------------------------------------------------------------------------------
