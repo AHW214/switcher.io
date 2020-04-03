@@ -38,7 +38,7 @@ type Switch =
 --------------------------------------------------------------------------------
 makeTempName :: FilePath -> Int -> IO FileName
 makeTempName dir len =
-  createUnique (directoryHasFile dir) (const $ randomRSequence ( 'A', 'z' ) len)
+  createUnique (directoryHasFile dir) (const $ randomRSequence ( 'A', 'Z' ) len)
 
 
 --------------------------------------------------------------------------------
