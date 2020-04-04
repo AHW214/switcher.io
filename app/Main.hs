@@ -15,7 +15,7 @@ import           System.Exit        (exitFailure, exitSuccess)
 import           FileSystem         (FileSystem)
 import qualified FileSystem         as FS
 import           Option
-import           Switch             (Switch)
+import           Switch             (Switches)
 import qualified Switch             as SW
 import           Util               (FileName, atLeast, whenJust)
 
@@ -39,13 +39,13 @@ askForYes question =
 
 
 --------------------------------------------------------------------------------
-pruneEmpty :: Traversable t => FileSystem (t a) -> Maybe (FileSystem (t a))
+pruneEmpty :: Foldable t => FileSystem (t a) -> Maybe (FileSystem (t a))
 pruneEmpty =
   FS.prune (not . null)
 
 
 --------------------------------------------------------------------------------
-numItemsInFolders :: Traversable t => FileSystem (t a) -> ( Int, Int )
+numItemsInFolders :: Foldable t => FileSystem (t a) -> ( Int, Int )
 numItemsInFolders =
   foldl count ( 0, 0 )
   where
@@ -111,8 +111,8 @@ runSwitch opts = do
 
 
 --------------------------------------------------------------------------------
-prepareUndo :: FileSystem [ Switch ]
- -> IO (Maybe (FileSystem [ Switch ]), Maybe (FileSystem [ Switch ]))
+prepareUndo :: FileSystem Switches
+  -> IO (Maybe (FileSystem Switches), Maybe (FileSystem Switches))
 prepareUndo =
   fmap (join bimap pruneEmpty . FS.unzip) . FS.runWith SW.sanitize
 

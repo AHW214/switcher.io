@@ -5,15 +5,19 @@ module Util
   , directoryHasFile
   , getTreeRoot
   , mapTreeRoot
+  , pairs
   , partitionM
   , pruneTree
   , renameInDirectory
+  , splitAfterM
   , whenJust
+  , wrap
   ) where
 
 
 --------------------------------------------------------------------------------
 import           Control.Monad    (foldM, forM_)
+import           Data.Functor     ((<&>))
 import           Data.Maybe       (mapMaybe)
 import           Data.Tree        (Tree(..))
 import           System.Directory (doesFileExist, renameFile)
@@ -34,7 +38,50 @@ atLeast n =
 
 
 --------------------------------------------------------------------------------
-partitionM :: (a -> IO Bool) -> [ a ] -> IO ( [ a ], [ a ] )
+wrap :: [ a ] -> [ a ]
+wrap xs =
+  case xs of
+    x:_ ->
+      xs ++ [ x ]
+
+    _ ->
+      []
+
+
+--------------------------------------------------------------------------------
+pairs :: [ a ] -> [ ( a, a ) ]
+pairs =
+  \case
+    x1:x2:xs ->
+      ( x1, x2 ) : pairs (x2:xs)
+
+    _ ->
+      []
+
+
+--------------------------------------------------------------------------------
+{- http://hackage.haskell.org/package/list-grouping-0.1.1/docs/src/Data-List-Grouping.html -}
+
+splitAfterM :: Monad m => (a -> m Bool) -> [ a ] -> m [ [ a ] ]
+splitAfterM _ [] = return []
+splitAfterM p xss@(x:xs) =
+  p x >>=
+    \case
+      True ->
+        ([ x ] :) <$> splitAfterM p xs
+
+      _ ->
+        splitAfterM p xs <&>
+          \case
+            [] ->
+              [ xss ]
+
+            ys:zs ->
+              (x:ys) : zs
+
+
+--------------------------------------------------------------------------------
+partitionM :: Monad m => (a -> m Bool) -> [ a ] -> m ( [ a ], [ a ] )
 partitionM predicate =
   foldM update ( [], [] )
   where

@@ -114,7 +114,7 @@ unzip fs =
 
 
 --------------------------------------------------------------------------------
-isEmpty :: Traversable t => FileSystem (t a) -> Bool
+isEmpty :: Foldable t => FileSystem (t a) -> Bool
 isEmpty =
   getAll . foldMap (All . null)
 
