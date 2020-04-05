@@ -39,13 +39,13 @@ askForYes question =
 
 
 --------------------------------------------------------------------------------
-pruneEmpty :: Traversable t => FileSystem (t a) -> Maybe (FileSystem (t a))
+pruneEmpty :: Foldable t => FileSystem (t a) -> Maybe (FileSystem (t a))
 pruneEmpty =
   FS.prune (not . null)
 
 
 --------------------------------------------------------------------------------
-numItemsInFolders :: Traversable t => FileSystem (t a) -> ( Int, Int )
+numItemsInFolders :: Foldable t => FileSystem (t a) -> ( Int, Int )
 numItemsInFolders =
   foldl count ( 0, 0 )
   where
