@@ -1,6 +1,6 @@
 module Switch
   ( Switches
-  , display
+  , displayEach
   , generate
   , isEmpty
   , load
@@ -16,18 +16,15 @@ import           Control.Monad     (guard)
 import           Data.List         (sortBy)
 import           Data.Ord          (comparing)
 import           System.Directory  (doesFileExist)
-import           System.FilePath   (takeFileName)
 import           System.IO.Error   (isDoesNotExistError)
 import           Text.Read         (readMaybe)
 
 
 --------------------------------------------------------------------------------
-import           FileSystem       (FileSystem)
-import qualified FileSystem       as FS
 import           Random           (randomRSequence, shuffleList)
-import           Util             (FileName, atLeast, both, createUnique,
+import           Util             (FileName, both, createUnique,
                                    directoryHasFile, pairs, partitionSequenceM,
-                                   renameInDirectory, splitAfterM, wrap)
+                                   renameInDirectory, wrap)
 
 
 --------------------------------------------------------------------------------
@@ -55,7 +52,7 @@ generate =
 
 
 --------------------------------------------------------------------------------
-serialize :: FileSystem Switches -> IO FilePath
+serialize :: Show (t Switches) => t Switches -> IO FilePath
 serialize switches = do
   fileName <- makeFileName
   writeFile fileName $ show switches
@@ -66,7 +63,7 @@ serialize switches = do
 
 
 --------------------------------------------------------------------------------
-load :: FilePath -> IO (Either String (FileSystem Switches))
+load :: Read (t Switches) => FilePath -> IO (Either String (t Switches))
 load path =
   validate <$> tryJust (guard . isDoesNotExistError) (readFile path)
   where
@@ -118,18 +115,6 @@ displayEach (Switches seqs) =
 
 
 --------------------------------------------------------------------------------
-display :: FileSystem Switches -> String
-display =
-  draw . showFolders
-  where
-    showFolders =
-      FS.mapBoth takeFileName displayEach
-
-    draw =
-      FS.drawManyWith id
-
-
---------------------------------------------------------------------------------
 switch :: FilePath -> Switches -> IO ()
 switch dir (Switches seqs) =
   mapM_ (switchSequence dir) seqs
@@ -158,6 +143,5 @@ switchSequence dir files = do
         _ ->
           return ()
 
-    rename f1 f2 =
-      -- renameInDirectory dir
-      putStrLn $ f1 ++ " -> " ++ f2
+    rename =
+      renameInDirectory dir

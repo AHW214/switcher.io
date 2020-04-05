@@ -8,6 +8,7 @@ import           Data.Functor       ((<&>))
 import           System.Directory   (getCurrentDirectory, removeFile)
 import           System.Environment (getArgs)
 import           System.Exit        (exitFailure, exitSuccess)
+import           System.FilePath    (takeFileName)
 
 
 --------------------------------------------------------------------------------
@@ -65,6 +66,18 @@ findFilesToSwitch =
 
 
 --------------------------------------------------------------------------------
+display :: FileSystem Switches -> String
+display =
+  draw . showFolders
+  where
+    showFolders =
+      FS.mapBoth takeFileName SW.displayEach
+
+    draw =
+      FS.drawManyWith id
+
+
+--------------------------------------------------------------------------------
 runSwitch :: Options -> IO ()
 runSwitch opts = do
   dir <- getCurrentDirectory
@@ -99,7 +112,7 @@ runSwitch opts = do
         switches <- mapM SW.generate fs
         FS.runWith_ SW.switch switches
         putStrLn $ "Done! These are the switches I made:\n\n"
-                  ++ SW.display switches
+                  ++ display switches
 
         unless (hasIrreversible opts) $ do
           switchFile <- SW.serialize switches
@@ -133,10 +146,10 @@ runUndo switchFile =
             ( Just include, exclude ) -> do
               whenJust exclude $ \ex ->
                 putStrLn $ "Switches that cannot be performed due to missing files:\n\n"
-                          ++ SW.display ex
+                          ++ display ex
 
               putStrLn $ "Switches that will be performed:\n\n"
-                        ++ SW.display include
+                        ++ display include
 
               askForYes "Type 'y(es)' to confirm the (un)switcheroos:"
 
