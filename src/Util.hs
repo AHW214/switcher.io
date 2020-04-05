@@ -1,19 +1,25 @@
 module Util
   ( FileName
   , atLeast
+  , both
   , createUnique
   , directoryHasFile
   , getTreeRoot
   , mapTreeRoot
+  , pairs
   , partitionM
+  , partitionSequenceM
   , pruneTree
   , renameInDirectory
+  , splitAfterM
   , whenJust
+  , wrap
   ) where
 
 
 --------------------------------------------------------------------------------
 import           Control.Monad    (foldM, forM_)
+import           Data.Functor     ((<&>))
 import           Data.Maybe       (mapMaybe)
 import           Data.Tree        (Tree(..))
 import           System.Directory (doesFileExist, renameFile)
@@ -34,7 +40,68 @@ atLeast n =
 
 
 --------------------------------------------------------------------------------
-partitionM :: (a -> IO Bool) -> [ a ] -> IO ( [ a ], [ a ] )
+both :: (a -> b) -> ( a, a ) -> ( b, b )
+both f ( x, y ) = ( f x, f y )
+
+
+--------------------------------------------------------------------------------
+wrap :: [ a ] -> [ a ]
+wrap xs =
+  case xs of
+    x:_ ->
+      xs ++ [ x ]
+
+    _ ->
+      []
+
+
+--------------------------------------------------------------------------------
+pairs :: [ a ] -> [ ( a, a ) ]
+pairs =
+  \case
+    x1:x2:xs ->
+      ( x1, x2 ) : pairs (x2:xs)
+
+    _ ->
+      []
+
+
+--------------------------------------------------------------------------------
+{- http://hackage.haskell.org/package/list-grouping-0.1.1/docs/src/Data-List-Grouping.html -}
+
+splitAfterM :: Monad m => (a -> m Bool) -> [ a ] -> m [ [ a ] ]
+splitAfterM _ [] = return []
+splitAfterM p xss@(x:xs) =
+  p x >>=
+    \case
+      True ->
+        ([ x ] :) <$> splitAfterM p xs
+
+      _ ->
+        splitAfterM p xs <&>
+          \case
+            [] ->
+              [ xss ]
+
+            ys:zs ->
+              (x:ys) : zs
+
+
+--------------------------------------------------------------------------------
+partitionSequenceM ::
+  Monad m => (a -> m Bool) -> [ a ] -> m ( [ [ a ] ], [ [ a ] ] )
+partitionSequenceM predicate xs = do
+  keep <- remove (fmap not . predicate) xs
+  discard <- remove predicate xs
+
+  return ( keep, discard )
+  where
+    remove p =
+      fmap (filter $ atLeast 2) . splitAfterM p
+
+
+--------------------------------------------------------------------------------
+partitionM :: Monad m => (a -> m Bool) -> [ a ] -> m ( [ a ], [ a ] )
 partitionM predicate =
   foldM update ( [], [] )
   where

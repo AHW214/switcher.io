@@ -1,38 +1,36 @@
 module Switch
-  ( Switch
+  ( Switches
+  , displayEach
   , generate
-  , sanitize
+  , isEmpty
   , load
+  , sanitize
   , serialize
-  , display
   , switch
-  , switchPairwise
   ) where
 
 
 --------------------------------------------------------------------------------
 import           Control.Exception (tryJust)
-import           Control.Monad     (guard, (<=<))
+import           Control.Monad     (guard)
 import           Data.List         (sortBy)
 import           Data.Ord          (comparing)
-import           Data.Tuple        (swap)
 import           System.Directory  (doesFileExist)
-import           System.FilePath   (takeFileName)
 import           System.IO.Error   (isDoesNotExistError)
 import           Text.Read         (readMaybe)
 
 
 --------------------------------------------------------------------------------
-import           FileSystem       (FileSystem)
-import qualified FileSystem       as FS
 import           Random           (randomRSequence, shuffleList)
-import           Util             (FileName, createUnique, directoryHasFile,
-                                   partitionM, renameInDirectory)
+import           Util             (FileName, both, createUnique,
+                                   directoryHasFile, pairs, partitionSequenceM,
+                                   renameInDirectory, wrap)
 
 
 --------------------------------------------------------------------------------
-type Switch =
-  ( FileName, FileName )
+newtype Switches =
+  Switches [ [ FileName ] ]
+  deriving (Read, Show)
 
 
 --------------------------------------------------------------------------------
@@ -42,13 +40,19 @@ makeTempName dir len =
 
 
 --------------------------------------------------------------------------------
-generate :: [ FileName ] -> IO [ Switch ]
-generate files =
-  zip files <$> shuffleList files
+isEmpty :: Switches -> Bool
+isEmpty (Switches seqs) =
+  null $ concat seqs
 
 
 --------------------------------------------------------------------------------
-serialize :: FileSystem [ Switch ] -> IO FilePath
+generate :: [ FileName ] -> IO Switches
+generate =
+  fmap (Switches . return . wrap) . shuffleList
+
+
+--------------------------------------------------------------------------------
+serialize :: Show (t Switches) => t Switches -> IO FilePath
 serialize switches = do
   fileName <- makeFileName
   writeFile fileName $ show switches
@@ -59,7 +63,7 @@ serialize switches = do
 
 
 --------------------------------------------------------------------------------
-load :: FilePath -> IO (Either String (FileSystem [ Switch ]))
+load :: Read (t Switches) => FilePath -> IO (Either String (t Switches))
 load path =
   validate <$> tryJust (guard . isDoesNotExistError) (readFile path)
   where
@@ -81,27 +85,27 @@ load path =
 
 
 --------------------------------------------------------------------------------
-sanitize :: FilePath -> [ Switch ] -> IO ( [ Switch ], [ Switch ] )
-sanitize dir =
-  partitionM canSwitch . invertSwitches
+sanitize :: FilePath -> Switches -> IO ( Switches, Switches )
+sanitize dir (Switches seqs) =
+  both (Switches . concat) . unzip <$> mapM (partitionSequenceM canSwitch . reverse) seqs
   where
-    invertSwitches =
-      map swap
-
     canSwitch =
-      directoryHasFile dir . fst
+      directoryHasFile dir
 
 
 --------------------------------------------------------------------------------
-displayEach :: [ Switch ] -> [ String ]
-displayEach switches =
+displayEach :: Switches -> [ String ]
+displayEach (Switches seqs) =
   map showSwitch sorted
   where
+    paired =
+      concatMap pairs seqs
+
     sorted =
-      sortBy (comparing fst) switches
+      sortBy (comparing fst) paired
 
     padLen =
-      maximum $ map (length . fst) switches
+      maximum $ map (length . fst) paired
 
     padding file =
       replicate (padLen - length file) ' '
@@ -111,44 +115,33 @@ displayEach switches =
 
 
 --------------------------------------------------------------------------------
-display :: FileSystem [ Switch ] -> String
-display =
-  draw . showFolders
-  where
-    showFolders =
-      FS.mapBoth takeFileName displayEach
-
-    draw =
-      FS.drawManyWith id
+switch :: FilePath -> Switches -> IO ()
+switch dir (Switches seqs) =
+  mapM_ (switchSequence dir) seqs
 
 
 --------------------------------------------------------------------------------
-switch :: FilePath -> [ Switch ] -> IO ()
-switch dir =
-  mapM_ fromTemp <=< mapM toTemp
+switchSequence :: FilePath -> [ FileName ] -> IO ()
+switchSequence dir files = do
+  t1 <- makeTemp
+  t2 <- makeTemp
+  switchSeq t1 t2 files
   where
-    toTemp ( file1, file2 ) = do
-      temp <- makeTempName dir 10
-      rename file1 temp
-      return ( temp, file2 )
+    makeTemp =
+      makeTempName dir 10
 
-    fromTemp ( temp, file2 ) =
-      rename temp file2
+    switchSeq t1 t2 =
+      \case
+        f1:f2:[] ->
+          rename f1 f2
 
-    rename =
-      renameInDirectory dir
+        f1:f2:fs -> do
+          rename f2 t1
+          rename f1 f2
+          switchSeq t2 t1 (t1:fs)
 
-
---------------------------------------------------------------------------------
-switchPairwise :: FilePath -> [ Switch ] -> IO ()
-switchPairwise dir =
-  mapM_ switcheroo
-  where
-    switcheroo ( file1, file2 ) = do
-      temp <- makeTempName dir 10
-      rename file1 temp
-      rename file2 file1
-      rename temp file2
+        _ ->
+          return ()
 
     rename =
       renameInDirectory dir

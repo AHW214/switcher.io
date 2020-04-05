@@ -2,22 +2,22 @@ module Main where
 
 
 --------------------------------------------------------------------------------
-import           Control.Monad      (join, unless)
-import           Data.Bifunctor     (bimap)
+import           Control.Monad      (unless)
 import           Data.Char          (toLower)
 import           Data.Functor       ((<&>))
 import           System.Directory   (getCurrentDirectory, removeFile)
 import           System.Environment (getArgs)
 import           System.Exit        (exitFailure, exitSuccess)
+import           System.FilePath    (takeFileName)
 
 
 --------------------------------------------------------------------------------
 import           FileSystem         (FileSystem)
 import qualified FileSystem         as FS
 import           Option
-import           Switch             (Switch)
+import           Switch             (Switches)
 import qualified Switch             as SW
-import           Util               (FileName, atLeast, whenJust)
+import           Util               (FileName, atLeast, both, whenJust)
 
 
 --------------------------------------------------------------------------------
@@ -39,12 +39,6 @@ askForYes question =
 
 
 --------------------------------------------------------------------------------
-pruneEmpty :: Foldable t => FileSystem (t a) -> Maybe (FileSystem (t a))
-pruneEmpty =
-  FS.prune (not . null)
-
-
---------------------------------------------------------------------------------
 numItemsInFolders :: Foldable t => FileSystem (t a) -> ( Int, Int )
 numItemsInFolders =
   foldl count ( 0, 0 )
@@ -61,11 +55,26 @@ findFilesToSwitch :: FileSystem [ FileName ] -> Maybe (FileSystem [ FileName ])
 findFilesToSwitch =
   pruneEmpty . fmap atLeastTwo
   where
+    pruneEmpty =
+      FS.prune (not . null)
+
     atLeastTwo xs =
       if atLeast 2 xs then
         xs
       else
         []
+
+
+--------------------------------------------------------------------------------
+display :: FileSystem Switches -> String
+display =
+  draw . showFolders
+  where
+    showFolders =
+      FS.mapBoth takeFileName SW.displayEach
+
+    draw =
+      FS.drawManyWith id
 
 
 --------------------------------------------------------------------------------
@@ -103,7 +112,7 @@ runSwitch opts = do
         switches <- mapM SW.generate fs
         FS.runWith_ SW.switch switches
         putStrLn $ "Done! These are the switches I made:\n\n"
-                  ++ SW.display switches
+                  ++ display switches
 
         unless (hasIrreversible opts) $ do
           switchFile <- SW.serialize switches
@@ -111,10 +120,13 @@ runSwitch opts = do
 
 
 --------------------------------------------------------------------------------
-prepareUndo :: FileSystem [ Switch ]
- -> IO (Maybe (FileSystem [ Switch ]), Maybe (FileSystem [ Switch ]))
+prepareUndo :: FileSystem Switches
+  -> IO (Maybe (FileSystem Switches), Maybe (FileSystem Switches))
 prepareUndo =
-  fmap (join bimap pruneEmpty . FS.unzip) . FS.runWith SW.sanitize
+  fmap (both pruneEmpty . FS.unzip) . FS.runWith SW.sanitize
+  where
+    pruneEmpty =
+      FS.prune (not . SW.isEmpty)
 
 
 --------------------------------------------------------------------------------
@@ -134,10 +146,10 @@ runUndo switchFile =
             ( Just include, exclude ) -> do
               whenJust exclude $ \ex ->
                 putStrLn $ "Switches that cannot be performed due to missing files:\n\n"
-                          ++ SW.display ex
+                          ++ display ex
 
               putStrLn $ "Switches that will be performed:\n\n"
-                        ++ SW.display include
+                        ++ display include
 
               askForYes "Type 'y(es)' to confirm the (un)switcheroos:"
 
