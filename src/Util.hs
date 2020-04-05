@@ -1,12 +1,14 @@
 module Util
   ( FileName
   , atLeast
+  , both
   , createUnique
   , directoryHasFile
   , getTreeRoot
   , mapTreeRoot
   , pairs
   , partitionM
+  , partitionSequenceM
   , pruneTree
   , renameInDirectory
   , splitAfterM
@@ -35,6 +37,11 @@ atLeast n =
     not . null . drop (n - 1)
   else
     const True
+
+
+--------------------------------------------------------------------------------
+both :: (a -> b) -> ( a, a ) -> ( b, b )
+both f ( x, y ) = ( f x, f y )
 
 
 --------------------------------------------------------------------------------
@@ -78,6 +85,19 @@ splitAfterM p xss@(x:xs) =
 
             ys:zs ->
               (x:ys) : zs
+
+
+--------------------------------------------------------------------------------
+partitionSequenceM ::
+  Monad m => (a -> m Bool) -> [ a ] -> m ( [ [ a ] ], [ [ a ] ] )
+partitionSequenceM predicate xs = do
+  keep <- remove (fmap not . predicate) xs
+  discard <- remove predicate xs
+
+  return ( keep, discard )
+  where
+    remove p =
+      fmap (filter $ atLeast 2) . splitAfterM p
 
 
 --------------------------------------------------------------------------------

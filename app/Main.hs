@@ -2,8 +2,7 @@ module Main where
 
 
 --------------------------------------------------------------------------------
-import           Control.Monad      (join, unless)
-import           Data.Bifunctor     (bimap)
+import           Control.Monad      (unless)
 import           Data.Char          (toLower)
 import           Data.Functor       ((<&>))
 import           System.Directory   (getCurrentDirectory, removeFile)
@@ -17,7 +16,7 @@ import qualified FileSystem         as FS
 import           Option
 import           Switch             (Switches)
 import qualified Switch             as SW
-import           Util               (FileName, atLeast, whenJust)
+import           Util               (FileName, atLeast, both, whenJust)
 
 
 --------------------------------------------------------------------------------
@@ -39,12 +38,6 @@ askForYes question =
 
 
 --------------------------------------------------------------------------------
-pruneEmpty :: Foldable t => FileSystem (t a) -> Maybe (FileSystem (t a))
-pruneEmpty =
-  FS.prune (not . null)
-
-
---------------------------------------------------------------------------------
 numItemsInFolders :: Foldable t => FileSystem (t a) -> ( Int, Int )
 numItemsInFolders =
   foldl count ( 0, 0 )
@@ -61,6 +54,9 @@ findFilesToSwitch :: FileSystem [ FileName ] -> Maybe (FileSystem [ FileName ])
 findFilesToSwitch =
   pruneEmpty . fmap atLeastTwo
   where
+    pruneEmpty =
+      FS.prune (not . null)
+
     atLeastTwo xs =
       if atLeast 2 xs then
         xs
@@ -114,7 +110,10 @@ runSwitch opts = do
 prepareUndo :: FileSystem Switches
   -> IO (Maybe (FileSystem Switches), Maybe (FileSystem Switches))
 prepareUndo =
-  fmap (join bimap pruneEmpty . FS.unzip) . FS.runWith SW.sanitize
+  fmap (both pruneEmpty . FS.unzip) . FS.runWith SW.sanitize
+  where
+    pruneEmpty =
+      FS.prune (not . SW.isEmpty)
 
 
 --------------------------------------------------------------------------------

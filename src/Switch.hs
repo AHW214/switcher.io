@@ -12,8 +12,7 @@ module Switch
 
 --------------------------------------------------------------------------------
 import           Control.Exception (tryJust)
-import           Control.Monad     (guard, join)
-import           Data.Bifunctor    (bimap)
+import           Control.Monad     (guard)
 import           Data.List         (sortBy)
 import           Data.Ord          (comparing)
 import           System.Directory  (doesFileExist)
@@ -26,28 +25,15 @@ import           Text.Read         (readMaybe)
 import           FileSystem       (FileSystem)
 import qualified FileSystem       as FS
 import           Random           (randomRSequence, shuffleList)
-import           Util             (FileName, atLeast, createUnique,
-                                   directoryHasFile, pairs, renameInDirectory,
-                                   splitAfterM, wrap)
+import           Util             (FileName, atLeast, both, createUnique,
+                                   directoryHasFile, pairs, partitionSequenceM,
+                                   renameInDirectory, splitAfterM, wrap)
 
 
 --------------------------------------------------------------------------------
 newtype Switches =
   Switches [ [ FileName ] ]
   deriving (Read, Show)
-
-
---------------------------------------------------------------------------------
-sanitizeSequence ::
-  Monad m => (a -> m Bool) -> [ a ] -> m ( [ [ a ] ], [ [ a ] ] )
-sanitizeSequence predicate xs = do
-  keep <- remove (fmap not . predicate) xs
-  discard <- remove predicate xs
-
-  return ( keep, discard )
-  where
-    remove p =
-      fmap (filter $ atLeast 2) . splitAfterM p
 
 
 --------------------------------------------------------------------------------
@@ -102,10 +88,9 @@ load path =
 
 
 --------------------------------------------------------------------------------
-sanitize ::
-  FilePath -> Switches -> IO ( Switches, Switches )
+sanitize :: FilePath -> Switches -> IO ( Switches, Switches )
 sanitize dir (Switches seqs) =
-  join bimap (Switches . concat) . unzip <$> mapM (sanitizeSequence canSwitch . reverse) seqs
+  both (Switches . concat) . unzip <$> mapM (partitionSequenceM canSwitch . reverse) seqs
   where
     canSwitch =
       directoryHasFile dir
